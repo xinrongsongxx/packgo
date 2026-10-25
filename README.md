@@ -1,5 +1,7 @@
 # PackGo — a calm, weather-aware packing list
 
+**[Try it in your browser](https://xinrongsongxx.github.io/packgo/app/)** · **[Download for Android](https://github.com/xinrongsongxx/packgo/releases/latest/download/PackGo.apk)** · [Website](https://xinrongsongxx.github.io/packgo/)
+
 PackGo builds a packing list for your trip from **who's going, where, when and the weather there**,
 then helps you pack it **one category at a time**, so a 40-item list never feels overwhelming.
 
