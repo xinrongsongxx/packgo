@@ -79,4 +79,4 @@ based on testing it on my own phone. I wrote the code together with an AI coding
 
 Weather data by [Open-Meteo](https://open-meteo.com/) (CC BY 4.0) · Font: [Inter](https://rsms.me/inter/) (SIL OFL 1.1)
 
-[Privacy policy](https://songxinrong.github.io/packgo/privacy.html)
+[Privacy policy](https://xinrongsongxx.github.io/packgo/privacy.html)
