@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Packing List Generator</title>
+  <title>PackGo</title>
+  <meta name="theme-color" content="#2E7DB5" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <meta name="apple-mobile-web-app-title" content="PackGo" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <style>
     /* Inter (variable, bundled so it works offline) — SIL Open Font License, see fonts/Inter-LICENSE.txt */
     @font-face {
@@ -501,7 +507,7 @@
           <span class="date-btn-sub" id="daysInfo"></span>
         </button>
       </div>
-      <div class="field">
+      <div class="field" id="remindField">
         <div class="label"><span class="dot"></span>Remind me before I leave</div>
         <div class="btn-row" id="remindRow">
           <div class="chip" data-value="7">1 week</div>
@@ -2243,6 +2249,8 @@
     // ================================================================
     window.addEventListener('load', () => {
       if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+      // Reminders need the Android app; in the browser version, don't offer them
+      if (!nativePlugins()) document.getElementById('remindField').hidden = true;
       show('home');
       const last = findTrip(storage.getItem('last_trip'));
       // 上次的行程还没结束 → 直接回到清单. Deferred until after the load event:

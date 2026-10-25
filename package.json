@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "web:publish": "rm -rf docs/app && mkdir -p docs/app && cp -R www/index.html www/fonts www/manifest.webmanifest www/icon-*.png docs/app/"
   },
   "keywords": [],
   "author": "",
