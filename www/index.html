@@ -1,0 +1,2254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Packing List Generator</title>
+  <style>
+    /* Inter (variable, bundled so it works offline) — SIL Open Font License, see fonts/Inter-LICENSE.txt */
+    @font-face {
+      font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
+      src: url('fonts/inter-latin-wght-normal.woff2') format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
+      src: url('fonts/inter-latin-ext-wght-normal.woff2') format('woff2');
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    /* ===== Glass Sky palette ===== */
+    :root {
+      --bg: #EEF4F8;
+      --ink: #0F2233;
+      --sky: #2E7DB5;
+      --aqua: #9FD8CF;
+      --muted: #3E5163;
+      --faint: #66798A;
+      --line: rgba(15,34,51,0.08);
+      --sky-soft: rgba(46,125,181,0.12);
+      --aqua-soft: rgba(159,216,207,0.45);
+      --glass: rgba(255,255,255,0.74);
+      --glass-strong: rgba(255,255,255,0.9);
+      --glass-border: rgba(255,255,255,0.85);
+      --shadow: 0 8px 30px rgba(15,34,51,0.07);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-feature-settings: 'cv11', 'ss01';   /* Inter's cleaner alternates */
+      letter-spacing: -0.006em;
+      background: var(--bg); color: var(--ink); min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      display: flex; justify-content: center;
+      padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px));
+    }
+    /* soft colour blobs behind the frosted glass */
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background:
+        radial-gradient(circle at 12% 8%,  rgba(159,216,207,0.75), transparent 42%),
+        radial-gradient(circle at 92% 28%, rgba(46,125,181,0.28),  transparent 45%),
+        radial-gradient(circle at 20% 78%, rgba(46,125,181,0.16),  transparent 48%),
+        radial-gradient(circle at 85% 95%, rgba(159,216,207,0.55), transparent 45%);
+    }
+    .app { width: 100%; max-width: 480px; }
+    .glass {
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+      backdrop-filter: blur(18px) saturate(150%);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow);
+    }
+    h1 { font-size: 24px; font-weight: 700; color: var(--ink); margin-bottom: 18px; letter-spacing: -0.02em; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .card { border-radius: 22px; padding: 20px 18px; margin-bottom: 16px; }
+    .field { margin-bottom: 20px; }
+    .field:last-child { margin-bottom: 0; }
+    .label { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .label .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sky); }
+    .label .hint { font-weight: 500; color: var(--faint); font-size: 12px; margin-left: auto; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      flex: 1; min-width: 56px; padding: 10px 6px; border-radius: 14px;
+      border: 1.5px solid rgba(255,255,255,0.9); background: rgba(255,255,255,0.6); color: var(--muted);
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+      text-align: center; user-select: none; font-family: inherit;
+    }
+    .chip:active { transform: scale(0.97); }
+    .chip.active { background: var(--sky-soft); border-color: var(--sky); color: var(--sky); font-weight: 700; }
+    .text-input {
+      width: 100%; padding: 13px 14px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.7); color: var(--ink); font-size: 16px; font-weight: 500; outline: none;
+      font-family: inherit; -webkit-appearance: none; appearance: none;
+    }
+    .text-input:focus { border-color: var(--sky); background: #fff; }
+    .text-input::placeholder { color: var(--faint); }
+    .date-row { display: flex; align-items: center; gap: 8px; }
+    .date-row input[type="date"] {
+      flex: 1; padding: 12px 8px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.7); color: var(--ink); font-size: 15px; font-weight: 500;
+      outline: none; font-family: inherit; min-width: 0;
+    }
+    .date-row input[type="date"]:focus { border-color: var(--sky); background: #fff; }
+    .days-info {
+      margin-top: 10px; font-size: 14px; color: var(--sky); font-weight: 700;
+      background: var(--sky-soft); padding: 8px 12px; border-radius: 12px; text-align: center;
+    }
+
+    /* Destination search */
+    .search-results { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .search-results[hidden] { display: none; }
+    .sr-item {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+      padding: 10px 14px; border-radius: 12px; border: none; background: rgba(255,255,255,0.75);
+      font-family: inherit; cursor: pointer;
+    }
+    .sr-item:active { background: var(--sky-soft); }
+    .sr-name { font-size: 16px; font-weight: 700; color: var(--ink); }
+    .sr-sub { font-size: 13px; color: var(--muted); }
+    .sr-msg { font-size: 13px; color: var(--muted); padding: 8px 4px; }
+    .dest-picked {
+      margin-top: 12px; padding: 12px 14px; border-radius: 16px;
+      background: var(--glass-strong); border: 1px solid var(--glass-border);
+    }
+    .dp-main { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 17px; color: var(--ink); }
+    .dp-main b { font-weight: 700; }
+    .dp-main span { font-size: 13px; color: var(--muted); }
+    .dp-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .sub-label { font-size: 12px; font-weight: 700; color: var(--faint); margin: 14px 0 8px; letter-spacing: 0.04em; text-transform: uppercase; }
+    .quick-row {
+      display: flex; gap: 8px; overflow-x: auto; margin: 0 -18px; padding: 2px 18px 4px;
+      scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    }
+    .quick-row::-webkit-scrollbar { display: none; }
+    .qchip {
+      flex: 0 0 auto; padding: 8px 12px; border-radius: 999px; white-space: nowrap;
+      border: 1.5px solid rgba(255,255,255,0.9); background: rgba(255,255,255,0.6);
+      color: var(--ink); font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+    }
+    .qchip.active { background: var(--sky-soft); border-color: var(--sky); color: var(--sky); }
+
+    /* Weather */
+    .weather-status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    .weather-status .spinner {
+      width: 12px; height: 12px; border: 2px solid rgba(46,125,181,0.2);
+      border-top-color: var(--sky); border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .weather-days { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+    .weather-day {
+      flex: 0 0 auto; min-width: 72px; background: rgba(255,255,255,0.6); border-radius: 16px;
+      padding: 10px 8px; text-align: center; border: 1px solid rgba(255,255,255,0.9);
+    }
+    .weather-day .wd-date { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .weather-day .wd-icon { font-size: 22px; margin: 4px 0 2px; }
+    .weather-day .wd-temp { font-size: 13px; color: var(--ink); font-weight: 700; }
+    .weather-day .wd-temp span { color: var(--faint); font-weight: 500; }
+    .weather-day .wd-precip { font-size: 11px; color: var(--sky); margin-top: 3px; font-weight: 700; }
+    .weather-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .weather-tag {
+      font-size: 12px; padding: 4px 10px; border-radius: 20px;
+      background: var(--aqua-soft); color: #1d5d55; font-weight: 700;
+    }
+    .weather-error { font-size: 13px; color: #9A5B12; background: rgba(255,214,153,0.45); padding: 10px 12px; border-radius: 12px; line-height: 1.5; }
+
+    .empty { text-align: center; color: var(--muted); font-size: 15px; padding: 40px 0; }
+    .footer { text-align: center; font-size: 13px; color: var(--faint); margin-top: 28px; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Steps */
+    .step { animation: fadeIn 0.3s ease; }
+    .step[hidden] { display: none; }
+    .gen-btn, .primary-btn {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 19px; border: none; border-radius: 999px;
+      background: linear-gradient(135deg, #2E7DB5, #3f97cc); color: #fff;
+      font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer;
+      box-shadow: 0 10px 24px rgba(46,125,181,0.28);
+    }
+    .gen-btn { margin-top: 8px; }
+    .primary-btn { margin-top: 30px; }
+    .gen-btn:active, .primary-btn:active { transform: scale(0.98); }
+
+    /* ===== Step 2 ===== */
+    .s2-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin: 8px 0 22px; }
+    .s2-title { font-size: 21px; font-weight: 700; color: var(--ink); margin-top: 4px; letter-spacing: -0.02em; }
+    .head-btns { display: flex; gap: 8px; flex-shrink: 0; }
+    .icon-btn {
+      width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; color: var(--ink);
+      display: grid; place-items: center; cursor: pointer;
+    }
+    .progress-card { border-radius: 26px; padding: 20px 22px; margin-bottom: 28px; display: flex; align-items: center; gap: 22px; }
+    .ring { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+    .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ring circle { fill: none; stroke-width: 9; }
+    .ring .ring-bg { stroke: rgba(46,125,181,0.12); }
+    .ring .ring-fg { stroke: url(#ringGrad); stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
+    .ring span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; font-weight: 700; color: var(--ink); }
+    .pc-title { font-size: 16px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+    .pc-sub { font-size: 14px; color: var(--muted); line-height: 1.55; }
+    .focus-meta { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--muted); }
+    .focus-title { font-size: 30px; font-weight: 700; color: var(--ink); margin: 12px 0 16px; letter-spacing: -0.02em; }
+    .focus-body { animation: fadeIn 0.3s ease; }
+    .f-item {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--glass-strong); border: 1px solid var(--glass-border); border-radius: 18px;
+      padding: 16px 18px; margin-bottom: 10px;
+      font-size: 16px; font-weight: 500; color: var(--ink);
+      cursor: pointer; user-select: none; transition: background 0.2s;
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    }
+    .f-item.done { background: var(--aqua-soft); border-color: transparent; }
+    .f-item.done .f-name { text-decoration: line-through; color: var(--muted); }
+    .f-check {
+      width: 26px; height: 26px; border-radius: 50%; border: 2px solid #9FB2C1;
+      flex-shrink: 0; display: grid; place-items: center; color: transparent; transition: all 0.15s;
+    }
+    .f-item.done .f-check { background: var(--sky); border-color: var(--sky); color: #fff; }
+    .f-name { word-break: break-word; }
+    .f-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .tag-forget { font-size: 12px; font-weight: 700; color: #9A5B12; background: rgba(255,214,153,0.6); padding: 4px 9px; border-radius: 10px; white-space: nowrap; }
+    .f-qty { font-size: 14px; font-weight: 700; color: var(--muted); }
+    .f-del { border: none; background: none; color: var(--faint); font-size: 21px; line-height: 1; padding: 0 2px; cursor: pointer; }
+    .f-add {
+      width: 100%; padding: 15px; border-radius: 18px; border: 1.5px dashed rgba(46,125,181,0.35);
+      background: transparent; color: var(--sky); font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+    .add-row { display: flex; gap: 8px; }
+    .add-row .text-input { flex: 1; }
+    .add-btn {
+      padding: 0 18px; border-radius: 14px; border: none; background: var(--sky); color: #fff;
+      font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .skip-link {
+      display: block; margin: 16px auto 0; padding: 6px 10px; background: none; border: none;
+      color: var(--muted); font-size: 14px; font-family: inherit; cursor: pointer;
+    }
+    .done-state { text-align: center; padding: 26px 0 0; }
+    .done-emoji { font-size: 44px; }
+    .done-title { font-size: 26px; font-weight: 700; color: var(--ink); margin-top: 12px; letter-spacing: -0.02em; }
+    .done-sub { font-size: 15px; color: var(--muted); margin-top: 8px; }
+
+    /* Full list view */
+    .share-row { display: flex; gap: 10px; margin-bottom: 18px; }
+    .ghost-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 14px 10px; border-radius: 16px; color: var(--sky);
+      font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+    .ghost-btn:active { transform: scale(0.98); }
+    .bulk-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin: -4px 0 14px; }
+    .text-btn {
+      background: none; border: none; color: var(--sky); font-size: 14px; font-weight: 700;
+      font-family: inherit; padding: 6px 8px; cursor: pointer;
+    }
+    .text-btn:disabled { color: var(--faint); cursor: default; }
+    .text-btn.inline { padding: 0; font-size: 13px; }
+    .cat-card { border-radius: 22px; padding: 16px 18px 6px; margin-bottom: 14px; }
+    .cat-head { display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+    .cat-count { font-size: 13px; font-weight: 700; color: var(--muted); }
+    .cat-card .f-item {
+      background: transparent; border: none; border-bottom: 1px solid var(--line); border-radius: 0;
+      padding: 12px 0; margin: 0; font-size: 16px; -webkit-backdrop-filter: none; backdrop-filter: none;
+    }
+    .cat-card .f-item { border-bottom: none; }
+    .cat-card .f-check { width: 22px; height: 22px; }
+
+    .toast {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      background: rgba(15,34,51,0.9); color: #fff; font-size: 14px; font-weight: 600;
+      padding: 10px 16px; border-radius: 999px; z-index: 10; animation: fadeIn 0.2s ease;
+    }
+    .toast[hidden] { display: none; }
+    .toast { display: flex; align-items: center; gap: 14px; max-width: calc(100% - 32px); white-space: nowrap; bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
+    .toast > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .toast-undo { flex-shrink: 0; background: none; border: none; color: var(--aqua); font: inherit; font-weight: 700; cursor: pointer; padding: 0; }
+
+    /* Sticky bottom action bar: the main action always sits under your thumb */
+    .bottom-bar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+      padding: 22px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+      background: linear-gradient(to top, rgba(238,244,248,0.97) 60%, rgba(238,244,248,0));
+    }
+    .bottom-inner { max-width: 480px; margin: 0 auto; }
+    .bottom-bar .primary-btn, .bottom-bar .gen-btn { margin-top: 0; }
+    .bottom-bar .skip-link { margin-top: 6px; padding: 4px 10px; }
+    .bar-spacer { height: 120px; }
+    .cat-done-line { font-size: 14px; color: var(--muted); padding: 4px 0 12px; }
+
+    /* Navigation */
+    .top-nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; min-height: 46px; }
+    .back-pill {
+      padding: 11px 16px; border-radius: 999px; color: var(--sky);
+      font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .back-pill:active { transform: scale(0.97); }
+
+    /* Home: My Trips */
+    .trip-card { border-radius: 22px; padding: 16px; margin-bottom: 12px; display: flex; gap: 14px; align-items: center; cursor: pointer; }
+    .trip-card:active { transform: scale(0.99); }
+    .trip-card.past { opacity: 0.6; }
+    .trip-emoji { font-size: 28px; width: 54px; height: 54px; border-radius: 18px; background: rgba(255,255,255,0.75); display: grid; place-items: center; flex-shrink: 0; }
+    .trip-info { flex: 1; min-width: 0; }
+    .trip-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .trip-name { font-size: 17px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .trip-badge { font-size: 12px; font-weight: 700; color: var(--sky); background: var(--sky-soft); padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+    .trip-dates { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .trip-bar { height: 6px; border-radius: 3px; background: rgba(46,125,181,0.12); margin-top: 10px; overflow: hidden; }
+    .trip-bar > div { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--sky), var(--aqua)); }
+    .trip-meta { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); font-weight: 600; margin-top: 6px; }
+    .home-empty { text-align: center; padding: 50px 20px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+    .home-empty .big { font-size: 56px; margin-bottom: 10px; }
+    .home-empty b { display: block; color: var(--ink); font-size: 19px; margin-bottom: 4px; }
+
+    /* Swipe actions behind each item */
+    .swipe-wrap { position: relative; border-radius: 18px; margin-bottom: 10px; overflow: hidden; }
+    .swipe-wrap .f-item { position: relative; z-index: 1; margin-bottom: 0; touch-action: pan-y; }
+    .swipe-act {
+      position: absolute; inset: 0; display: flex; align-items: center; padding: 0 22px;
+      font-size: 15px; font-weight: 700; color: #fff; opacity: 0;
+    }
+    .swipe-act.left  { background: #D98E1F; justify-content: flex-start; }
+    .swipe-act.right { background: #E5484D; justify-content: flex-end; }
+    .swipe-wrap.swiping .swipe-act.right,
+    .swipe-wrap.swiping.show-left .swipe-act.left { opacity: 1; }
+    .swipe-wrap.swiping.show-left .swipe-act.right { opacity: 0; }
+    .swipe-wrap.armed .swipe-act { filter: brightness(0.9); }
+    .swipe-wrap.swiping .f-item { background: #fff; }
+    .swipe-wrap.swiping .f-item.done { background: #e2f3f0; }
+    .cat-card .swipe-wrap { border-radius: 0; margin: 0; border-bottom: 1px solid var(--line); }
+
+    /* Quantity: tap the pill to adjust */
+    .qty-pill {
+      border: none; background: rgba(46,125,181,0.10); color: var(--sky); font-family: inherit;
+      font-size: 14px; font-weight: 700; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+    }
+    .qty-pill.one { color: var(--faint); background: rgba(15,34,51,0.05); }
+    .stepper { display: flex; align-items: center; gap: 2px; background: #fff; border-radius: 999px; padding: 3px; box-shadow: 0 2px 10px rgba(15,34,51,0.08); }
+    .stepper button {
+      width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--sky-soft);
+      color: var(--sky); font-size: 19px; font-weight: 700; line-height: 1; cursor: pointer; font-family: inherit;
+    }
+    .stepper span { min-width: 26px; text-align: center; font-size: 15px; font-weight: 700; color: var(--ink); }
+
+    /* Reminders */
+    .time-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 15px; font-weight: 600; color: var(--ink); }
+    .time-input {
+      padding: 10px 12px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.8); color: var(--ink); font-size: 16px; font-weight: 700; font-family: inherit; outline: none;
+    }
+    .time-input:focus { border-color: var(--sky); }
+    .remind-off { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+    /* Dates: one button opens one calendar */
+    .date-btn {
+      width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding: 14px 16px; border-radius: 16px; border: 1.5px solid rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.8); font-family: inherit; cursor: pointer; text-align: left;
+    }
+    .date-btn:active { transform: scale(0.99); }
+    .date-btn-main { font-size: 16px; font-weight: 700; color: var(--ink); }
+    .date-btn-sub { font-size: 14px; font-weight: 700; color: var(--sky); background: var(--sky-soft); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+    .sheet-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(15,34,51,0.4); display: flex; align-items: flex-end; justify-content: center; }
+    .sheet-backdrop[hidden] { display: none; }
+    .sheet {
+      width: 100%; max-width: 480px; max-height: 82vh; display: flex; flex-direction: column;
+      background: #fff; border-radius: 26px 26px 0 0; box-shadow: 0 -10px 40px rgba(15,34,51,0.15);
+      padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+    .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .sheet-head b { font-size: 17px; color: var(--ink); }
+    .sheet-sub { font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+    .cal-weekdays, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .cal-weekdays { font-size: 13px; font-weight: 700; color: var(--muted); text-align: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .cal-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .cal-mtitle { font-size: 16px; font-weight: 700; color: var(--ink); margin: 16px 4px 8px; }
+    .cal-day {
+      height: 44px; border: none; background: none; font-family: inherit; font-size: 16px; font-weight: 600;
+      color: var(--ink); cursor: pointer; position: relative;
+    }
+    .cal-day:disabled { color: #b3c0cb; cursor: default; }
+    .cal-day.today { color: var(--sky); font-weight: 700; }
+    .cal-day.in-range { background: var(--sky-soft); }
+    .cal-day span { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; }
+    .cal-day.start, .cal-day.end { background: var(--sky-soft); }
+    .cal-day.start { border-radius: 22px 0 0 22px; }
+    .cal-day.end { border-radius: 0 22px 22px 0; }
+    .cal-day.start.end, .cal-day.pick { border-radius: 22px; background: none; }
+    .cal-day.start span, .cal-day.end span, .cal-day.pick span { background: var(--sky); color: #fff; font-weight: 700; }
+    .gen-btn.is-disabled { opacity: 0.5; box-shadow: none; }
+
+    /* Packing list: countdown + obvious select-all */
+    .countdown { margin: 4px 0 4px; }
+    .cd-big { display: block; font-size: 28px; font-weight: 700; color: var(--sky); letter-spacing: -0.01em; }
+    .cd-small { display: block; font-size: 15px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+    .focus-title-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 12px 0 16px; }
+    .focus-title-row .focus-title { margin: 0; }
+    .sel-pill {
+      display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+      padding: 9px 14px; border-radius: 999px; border: 1.5px solid var(--sky);
+      background: rgba(255,255,255,0.85); color: var(--sky);
+      font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+    .sel-pill:active { transform: scale(0.97); }
+    .sel-pill.solid { background: var(--sky); color: #fff; }
+    .sel-pill:disabled { opacity: 0.4; cursor: default; }
+    .cat-add {
+      display: block; width: 100%; text-align: left; padding: 12px 0 10px; border: none;
+      background: none; color: var(--sky); font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+    .cat-card .add-row { padding: 8px 0 12px; }
+  </style>
+</head>
+<body>
+  <!-- shared gradient for the progress ring -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2E7DB5"/><stop offset="1" stop-color="#9FD8CF"/></linearGradient></defs>
+  </svg>
+
+  <div class="app">
+   <!-- ===== STEP 1: Trip details ===== -->
+   <!-- ===== HOME: My Trips ===== -->
+   <section class="step" id="home" hidden>
+    <h1>🧳 My Trips</h1>
+    <div id="tripList"></div>
+    <div class="bar-spacer"></div>
+    <div class="bottom-bar"><div class="bottom-inner">
+      <button class="gen-btn" id="newTripBtn">＋ Plan a new trip</button>
+    </div></div>
+   </section>
+
+   <section class="step" id="step1" hidden>
+    <div class="top-nav"><button class="back-pill glass" id="editBackBtn">‹ Back</button></div>
+    <h1 id="editTitle">Plan a trip</h1>
+
+    <!-- Travelers -->
+    <div class="card glass">
+      <div class="field">
+        <div class="label"><span class="dot"></span>Adults</div>
+        <div class="btn-row" id="adultCountRow">
+          <div class="chip active" data-value="1">1</div>
+          <div class="chip" data-value="2">2</div>
+          <div class="chip" data-value="3">3</div>
+          <div class="chip" data-value="4">4</div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="label"><span class="dot"></span>Adult Age</div>
+        <div class="btn-row" id="adultAgeRow">
+          <div class="chip" data-value="24">18–30</div>
+          <div class="chip active" data-value="38">31–45</div>
+          <div class="chip" data-value="52">46–59</div>
+          <div class="chip" data-value="68">60+</div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="label"><span class="dot"></span>Gender</div>
+        <div class="btn-row" id="genderRow">
+          <div class="chip active" data-value="female">Female</div>
+          <div class="chip" data-value="male">Male</div>
+          <div class="chip" data-value="mixed">Mixed</div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="label"><span class="dot"></span>Children</div>
+        <div class="btn-row" id="childCountRow">
+          <div class="chip active" data-value="0">None</div>
+          <div class="chip" data-value="1">1</div>
+          <div class="chip" data-value="2">2</div>
+          <div class="chip" data-value="3">3</div>
+        </div>
+      </div>
+      <div class="field" id="childAgeField" style="display:none;">
+        <div class="label"><span class="dot"></span>Child Age</div>
+        <div class="btn-row" id="childAgeRow">
+          <div class="chip active" data-value="1">0–2</div>
+          <div class="chip" data-value="4">3–6</div>
+          <div class="chip" data-value="9">7–12</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Destination -->
+    <div class="card glass">
+      <div class="field">
+        <div class="label"><span class="dot"></span>Destination</div>
+        <input type="search" id="destSearch" class="text-input" placeholder="Where are you going?" autocomplete="off" />
+        <div class="search-results" id="searchResults" hidden></div>
+        <div class="dest-picked" id="destPicked"></div>
+        <div class="sub-label">Popular</div>
+        <div class="quick-row" id="quickRow"></div>
+      </div>
+      <div class="field">
+        <div class="label"><span class="dot"></span>Trip Type</div>
+        <div class="btn-row" id="tripTypeRow">
+          <div class="chip" data-value="beach">🏖️ Beach</div>
+          <div class="chip" data-value="city">🏙️ City</div>
+          <div class="chip" data-value="hiking">🥾 Hiking</div>
+          <div class="chip" data-value="ski">⛷️ Snow</div>
+          <div class="chip" data-value="business">💼 Work</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dates -->
+    <div class="card glass">
+      <div class="field">
+        <div class="label"><span class="dot"></span>Travel Dates</div>
+        <button type="button" class="date-btn" id="dateBtn">
+          <span class="date-btn-main" id="dateBtnMain">Pick your dates</span>
+          <span class="date-btn-sub" id="daysInfo"></span>
+        </button>
+      </div>
+      <div class="field">
+        <div class="label"><span class="dot"></span>Remind me before I leave</div>
+        <div class="btn-row" id="remindRow">
+          <div class="chip" data-value="7">1 week</div>
+          <div class="chip" data-value="3">3 days</div>
+          <div class="chip" data-value="1">1 day</div>
+        </div>
+        <div class="time-row" id="remindTimeRow">🔔 at <input type="time" id="remindTime" class="time-input" value="20:00" /></div>
+      </div>
+    </div>
+
+    <!-- Weather (auto) -->
+    <div class="card glass">
+      <div class="field">
+        <div class="label"><span class="dot"></span>Weather</div>
+        <div class="weather-status" id="weatherStatus">
+          <div class="spinner"></div>
+          <span>Fetching weather…</span>
+        </div>
+        <div class="weather-days" id="weatherDays"></div>
+        <div class="weather-tags" id="weatherTags"></div>
+      </div>
+    </div>
+
+    <!-- Generate button -->
+    <div class="bar-spacer"></div>
+    <div class="bottom-bar"><div class="bottom-inner">
+      <button class="gen-btn" id="genBtn">
+        <span class="btn-text">Generate Packing List</span>
+        <span class="btn-arrow">→</span>
+      </button>
+    </div></div>
+   </section>
+
+   <!-- ===== STEP 2: Packing list (focus mode / full list) ===== -->
+   <section class="step" id="step2" hidden>
+    <div id="result"></div>
+   </section>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+
+  <!-- Date range picker: tap departure, tap return, done -->
+  <div class="sheet-backdrop" id="calSheet" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="calHint">
+      <div class="sheet-head"><b id="calHint">When do you leave?</b><button class="text-btn" id="calClose">Close</button></div>
+      <div class="cal-weekdays" id="calWeekdays"></div>
+      <div class="cal-scroll" id="calScroll"></div>
+    </div>
+  </div>
+
+  <script>
+    // ================================================================
+    // 0. SAFE STORAGE (localStorage 包装器，防止崩溃)
+    // ================================================================
+    const storage = {
+      getItem(key) {
+        try { return localStorage.getItem(key); } catch (e) { return null; }
+      },
+      setItem(key, val) {
+        try { localStorage.setItem(key, val); } catch (e) {}
+      },
+      removeItem(key) {
+        try { localStorage.removeItem(key); } catch (e) {}
+      }
+    };
+
+    // ================================================================
+    // 1. DATA
+    // ================================================================
+    // Home country comes from the phone's language/region (en-GB → GB, zh → CN).
+    // A destination in another country counts as "abroad" (passport, adapter…).
+    const HOME_COUNTRY = (() => {
+      try {
+        const loc = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+        return new Intl.Locale(loc).maximize().region || null;
+      } catch (e) { return null; }
+    })();
+
+    // Popular quick picks. `tags` are typical-climate fallbacks (used only when weather can't be loaded,
+    // except 'plateau' which always applies); `types` pre-select the trip type chips.
+    const DESTINATIONS = [
+      { id:'tokyo', emoji:'🗼', name:'Tokyo', country:'Japan', cc:'JP', lat:35.68, lon:139.69, tags:['temperate','rain'], types:['city'] },
+      { id:'paris', emoji:'🥐', name:'Paris', country:'France', cc:'FR', lat:48.86, lon:2.35, tags:['temperate','rain'], types:['city'] },
+      { id:'london', emoji:'🎡', name:'London', country:'UK', cc:'GB', lat:51.51, lon:-0.13, tags:['temperate','rain'], types:['city'] },
+      { id:'newyork', emoji:'🗽', name:'New York', country:'USA', cc:'US', lat:40.71, lon:-74.01, tags:['temperate','rain'], types:['city'] },
+      { id:'bangkok', emoji:'🛕', name:'Bangkok', country:'Thailand', cc:'TH', lat:13.76, lon:100.50, tags:['hot','humid','sun'], types:['city'] },
+      { id:'bali', emoji:'🌺', name:'Bali', country:'Indonesia', cc:'ID', lat:-8.41, lon:115.19, tags:['hot','humid','sun'], types:['beach'] },
+      { id:'seoul', emoji:'🇰🇷', name:'Seoul', country:'South Korea', cc:'KR', lat:37.57, lon:126.98, tags:['temperate'], types:['city'] },
+      { id:'singapore', emoji:'🦁', name:'Singapore', country:'Singapore', cc:'SG', lat:1.35, lon:103.82, tags:['hot','humid','rain'], types:['city'] },
+      { id:'rome', emoji:'🏛️', name:'Rome', country:'Italy', cc:'IT', lat:41.90, lon:12.50, tags:['temperate','sun'], types:['city'] },
+      { id:'sydney', emoji:'🦘', name:'Sydney', country:'Australia', cc:'AU', lat:-33.87, lon:151.21, tags:['temperate','sun'], types:['city'] },
+      { id:'dubai', emoji:'🏙️', name:'Dubai', country:'UAE', cc:'AE', lat:25.20, lon:55.27, tags:['hot','sun'], types:['city'] },
+      { id:'losangeles', emoji:'🎬', name:'Los Angeles', country:'USA', cc:'US', lat:34.05, lon:-118.24, tags:['temperate','sun'], types:['city'] },
+      { id:'vancouver', emoji:'🍁', name:'Vancouver', country:'Canada', cc:'CA', lat:49.28, lon:-123.12, tags:['temperate','rain'], types:['city'] },
+      { id:'maldives', emoji:'🐠', name:'Maldives', country:'Maldives', cc:'MV', lat:4.18, lon:73.51, tags:['hot','humid','sun'], types:['beach'] },
+      { id:'phuket', emoji:'🏖️', name:'Phuket', country:'Thailand', cc:'TH', lat:7.88, lon:98.39, tags:['hot','humid','sun'], types:['beach'] },
+      { id:'beijing', emoji:'🏯', name:'Beijing', country:'China', cc:'CN', lat:39.90, lon:116.40, tags:['temperate'], types:['city'] },
+      { id:'shanghai', emoji:'🌃', name:'Shanghai', country:'China', cc:'CN', lat:31.23, lon:121.47, tags:['humid','rain'], types:['city'] },
+      { id:'chengdu', emoji:'🌶️', name:'Chengdu', country:'China', cc:'CN', lat:30.57, lon:104.07, tags:['humid','rain'], types:['city'] },
+      { id:'xian', emoji:'🏺', name:"Xi'an", country:'China', cc:'CN', lat:34.34, lon:108.94, tags:['temperate'], types:['city'] },
+      { id:'guilin', emoji:'🏞️', name:'Guilin', country:'China', cc:'CN', lat:25.27, lon:110.29, tags:['humid','rain'], types:['hiking'] },
+      { id:'lijiang', emoji:'⛰️', name:'Lijiang', country:'China', cc:'CN', lat:26.86, lon:100.23, tags:['plateau','sun','temperate'], types:['hiking'] },
+      { id:'lhasa', emoji:'🏔️', name:'Lhasa', country:'China', cc:'CN', lat:29.65, lon:91.14, tags:['plateau','sun','cold'], types:['hiking'] },
+      { id:'harbin', emoji:'❄️', name:'Harbin', country:'China', cc:'CN', lat:45.80, lon:126.53, tags:['cold','snow'], types:['city'] },
+      { id:'sanya', emoji:'🌴', name:'Sanya', country:'China', cc:'CN', lat:18.25, lon:109.51, tags:['hot','sun','humid'], types:['beach'] }
+    ];
+
+    const RULES = [
+      // Documents
+      { id:'idcard', name:'ID Card', cat:'Documents', cond:()=>true, qty:()=>1 },
+      { id:'cash', name:'Cash / Credit Cards', cat:'Documents', cond:()=>true, qty:()=>1 },
+      { id:'passport', name:'Passport', cat:'Documents', cond:m=>m.tags.includes('abroad'), qty:()=>1 },
+      { id:'visa', name:'Visa / Entry Permit', cat:'Documents', cond:m=>m.tags.includes('abroad'), qty:()=>1 },
+      { id:'insure', name:'Travel Insurance', cat:'Documents', cond:m=>m.tags.includes('abroad')||m.days>=7||m.tags.includes('ski'), qty:()=>1 },
+      { id:'copies', name:'Copies of Passport / ID', cat:'Documents', cond:m=>m.tags.includes('abroad'), qty:()=>2 },
+      { id:'flight', name:'Flight / Hotel Reservation', cat:'Documents', cond:m=>m.tags.includes('abroad')||m.days>=3, qty:()=>1, perTrip:true },
+      { id:'emergency', name:'Emergency Contacts', cat:'Documents', cond:m=>m.tags.includes('abroad'), qty:()=>1, perTrip:true },
+      { id:'bizcards', name:'Business Cards', cat:'Documents', cond:m=>m.tags.includes('business')&&m.role==='adult', qty:()=>1, perTrip:true },
+
+      // Electronics
+      { id:'phone', name:'Phone', cat:'Electronics', cond:()=>true, qty:()=>1 },
+      { id:'charger', name:'Charger', cat:'Electronics', cond:()=>true, qty:()=>1 },
+      { id:'powerbank', name:'Power Bank', cat:'Electronics', cond:m=>m.days>=2||m.tags.includes('hiking'), qty:()=>1 },
+      { id:'earphone', name:'Earphones', cat:'Electronics', cond:m=>m.days>=2, qty:()=>1 },
+      { id:'adapter', name:'Travel Adapter / Converter', cat:'Electronics', cond:m=>m.tags.includes('abroad'), qty:()=>1, perTrip:true },
+      { id:'sim', name:'International SIM / eSIM', cat:'Electronics', cond:m=>m.tags.includes('abroad'), qty:()=>1, perTrip:true },
+      { id:'translate', name:'Translation App', cat:'Electronics', cond:m=>m.tags.includes('abroad'), qty:()=>1, perTrip:true },
+      { id:'camera', name:'Camera / Memory Card', cat:'Electronics', cond:m=>m.tags.includes('beach')||m.tags.includes('snow')||m.tags.includes('hiking')||m.weather.includes('snowy')||m.days>=5, qty:()=>1, perTrip:true },
+      { id:'laptop', name:'Laptop + Charger', cat:'Electronics', cond:m=>m.tags.includes('business')&&m.role==='adult', qty:()=>1 },
+
+      // Clothing
+      { id:'underwear', name:'Underwear', cat:'Clothing', cond:()=>true, qty:m=>Math.min(m.days+1,8) },
+      { id:'socks', name:'Socks', cat:'Clothing', cond:()=>true, qty:m=>Math.min(m.days+1,8) },
+      { id:'tops', name:'Tops', cat:'Clothing', cond:()=>true, qty:m=>Math.ceil(m.days/2)+1 },
+      { id:'pants', name:'Pants', cat:'Clothing', cond:()=>true, qty:m=>Math.ceil(m.days/3)+1 },
+      { id:'pajamas', name:'Pajamas', cat:'Clothing', cond:m=>m.days>=3, qty:()=>1 },
+      { id:'formal', name:'Work Outfit', cat:'Clothing', cond:m=>m.tags.includes('business')&&m.role==='adult', qty:m=>Math.ceil(m.days/2) },
+      { id:'coat', name:'Jacket / Windbreaker', cat:'Clothing', cond:m=>m.tags.includes('temperate')||m.tags.includes('plateau')||m.tags.includes('hiking')||m.weather.includes('mild')||m.weather.includes('windy'), qty:()=>1 },
+      { id:'down', name:'Down Jacket', cat:'Clothing', cond:m=>m.tags.includes('cold')||m.tags.includes('snow')||m.weather.includes('cold')||m.weather.includes('snowy'), qty:()=>1 },
+      { id:'thermal', name:'Thermal Base Layers', cat:'Clothing', cond:m=>m.tags.includes('ski')||(m.weather.includes('cold')&&m.tags.includes('hiking')), qty:()=>2 },
+      { id:'gloves', name:'Gloves / Scarf / Beanie', cat:'Clothing', cond:m=>m.tags.includes('cold')||m.tags.includes('snow')||m.weather.includes('cold')||m.weather.includes('snowy')||m.weather.includes('windy'), qty:()=>1 },
+      { id:'swimsuit', name:'Swimsuit', cat:'Clothing', cond:m=>m.tags.includes('beach'), qty:()=>1 },
+      { id:'shorts', name:'Shorts / Skirt', cat:'Clothing', cond:m=>m.tags.includes('hot')||m.tags.includes('beach')||m.weather.includes('hot'), qty:m=>Math.ceil(m.days/3) },
+      { id:'hikeboots', name:'Hiking Boots', cat:'Clothing', cond:m=>m.tags.includes('hiking'), qty:()=>1 },
+      { id:'shoes', name:'Walking Shoes', cat:'Clothing', cond:m=>!m.tags.includes('hiking')&&(m.tags.includes('city')||m.tags.includes('plateau')||m.days>=4), qty:()=>1 },
+      { id:'slippers', name:'Slippers', cat:'Clothing', cond:m=>m.tags.includes('beach')||m.days>=5, qty:()=>1 },
+
+      // Toiletries
+      { id:'toothbrush', name:'Toothbrush', cat:'Toiletries', cond:()=>true, qty:()=>1 },
+      { id:'toothpaste', name:'Toothpaste', cat:'Toiletries', cond:()=>true, qty:()=>1, perTrip:true },
+      { id:'towel', name:'Towel', cat:'Toiletries', cond:m=>m.days>=2, qty:()=>1 },
+      { id:'shampoo', name:'Shampoo / Body Wash', cat:'Toiletries', cond:m=>m.days>=3, qty:()=>1, perTrip:true },
+      { id:'skincare', name:'Skincare', cat:'Toiletries', cond:m=>m.ageGroup!=='baby', qty:()=>1 },
+      { id:'sunscreen', name:'Sunscreen', cat:'Toiletries', cond:m=>m.tags.includes('sun')||m.tags.includes('beach')||m.tags.includes('plateau')||m.tags.includes('ski')||m.tags.includes('hiking')||m.weather.includes('sunny')||m.weather.includes('hot'), qty:()=>1, perTrip:true },
+      { id:'makeup', name:'Makeup', cat:'Toiletries', cond:m=>m.gender==='female'&&m.ageGroup==='adult', qty:()=>1 },
+      { id:'sanitary', name:'Sanitary Pads', cat:'Toiletries', cond:m=>m.gender==='female'&&m.ageGroup!=='baby', qty:()=>1 },
+      { id:'shaver', name:'Razor', cat:'Toiletries', cond:m=>m.gender==='male'&&m.ageGroup==='adult', qty:()=>1 },
+      { id:'lipbalm', name:'Lip Balm', cat:'Toiletries', cond:m=>m.tags.includes('cold')||m.tags.includes('plateau')||m.weather.includes('cold')||m.weather.includes('snowy')||m.weather.includes('dry'), qty:()=>1 },
+
+      // Medicine
+      { id:'medicine', name:'Basic Medicine', cat:'Medicine', cond:m=>m.days>=3||m.ageGroup==='senior', qty:()=>1, perTrip:true },
+      { id:'motion', name:'Motion Sickness Pills', cat:'Medicine', cond:m=>m.tags.includes('plateau')||m.days>=5, qty:()=>1, perTrip:true },
+      { id:'altitude', name:'Altitude Sickness Pills', cat:'Medicine', cond:m=>m.tags.includes('plateau'), qty:()=>1, perTrip:true },
+      { id:'blister', name:'Blister Plasters', cat:'Medicine', cond:m=>m.tags.includes('hiking'), qty:()=>1, perTrip:true },
+      { id:'mosquito', name:'Mosquito Repellent', cat:'Medicine', cond:m=>m.tags.includes('humid')||m.weather.includes('humid')||m.weather.includes('hot'), qty:()=>1, perTrip:true },
+      { id:'mask', name:'Face Masks', cat:'Medicine', cond:()=>true, qty:m=>Math.min(m.days*2,10) },
+
+      // Baby
+      { id:'diaper', name:'Diapers', cat:'Baby', cond:m=>m.ageGroup==='baby', qty:m=>m.days*6 },
+      { id:'milk', name:'Formula / Bottle', cat:'Baby', cond:m=>m.ageGroup==='baby', qty:()=>1 },
+      { id:'babyfood', name:'Baby Food / Snacks', cat:'Baby', cond:m=>m.ageGroup==='baby'||m.ageGroup==='child', qty:()=>1 },
+      { id:'babycoat', name:'Baby Clothes', cat:'Baby', cond:m=>m.ageGroup==='baby', qty:m=>m.days+2 },
+      { id:'stroller', name:'Stroller / Carrier', cat:'Baby', cond:m=>m.ageGroup==='baby', qty:()=>1, perTrip:true },
+
+      // Kids
+      { id:'toy', name:'Toys / Books', cat:'Kids', cond:m=>m.ageGroup==='baby'||m.ageGroup==='child', qty:()=>2 },
+      { id:'kidid', name:'Child ID', cat:'Kids', cond:m=>m.ageGroup==='baby'||m.ageGroup==='child', qty:()=>1 },
+
+      // Other
+      { id:'umbrella', name:'Umbrella / Raincoat', cat:'Other', cond:m=>m.tags.includes('rain')||m.tags.includes('humid')||m.weather.includes('rainy'), qty:()=>1, perTrip:true },
+      { id:'waterbottle', name:'Water Bottle', cat:'Other', cond:()=>true, qty:()=>1 },
+      { id:'daypack', name:'Daypack', cat:'Other', cond:m=>m.tags.includes('hiking')&&m.role==='adult', qty:()=>1 },
+      { id:'goggles', name:'Ski Goggles', cat:'Other', cond:m=>m.tags.includes('ski'), qty:()=>1 },
+      { id:'bag', name:'Packing Cubes / Laundry Bag', cat:'Other', cond:m=>m.days>=3, qty:()=>2, perTrip:true },
+      { id:'laundry', name:'Laundry Detergent', cat:'Other', cond:m=>m.days>=5, qty:()=>1, perTrip:true },
+      { id:'sunglasses', name:'Sunglasses', cat:'Other', cond:m=>m.tags.includes('sun')||m.tags.includes('beach')||m.tags.includes('snow')||m.weather.includes('sunny'), qty:()=>1 },
+      { id:'hat', name:'Sun Hat', cat:'Other', cond:m=>m.tags.includes('sun')||m.tags.includes('beach')||m.weather.includes('sunny'), qty:()=>1 },
+      { id:'snack', name:'Snacks', cat:'Other', cond:m=>m.days>=3||m.tags.includes('hiking'), qty:()=>1, perTrip:true },
+      { id:'cushion', name:'Neck Pillow / Eye Mask', cat:'Other', cond:m=>m.ageGroup==='senior'||m.days>=5||m.tags.includes('abroad'), qty:()=>1 },
+      { id:'luggagetag', name:'Luggage Tags', cat:'Other', cond:m=>m.tags.includes('abroad'), qty:()=>1, perTrip:true }
+    ];
+
+    const CAT_ICON = { 'Documents':'📄','Electronics':'🔌','Clothing':'👕','Toiletries':'🧴','Medicine':'💊','Baby':'🍼','Kids':'🧸','Other':'🎒' };
+    const CAT_ORDER = ['Documents','Electronics','Clothing','Toiletries','Medicine','Baby','Kids','Other'];
+    const WEEKDAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // ================================================================
+    // 2. STATE
+    // ================================================================
+    function toDateStr(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+    const today = new Date(); today.setHours(0,0,0,0);
+    const inTwoDays = new Date(); inTwoDays.setDate(today.getDate()+2);
+
+    const state = {
+      adultCount:1, adultAge:38,
+      childCount:0, childAge:4,
+      gender:'female',
+      dest: null,               // no default — the user picks where they're going
+      tripTypes: new Set(),
+      tripId:null,
+      remindDays:[1],           // reminders: any of 7 / 3 / 1 days before departure
+      remindTime:'20:00',
+      startDate:toDateStr(today),
+      endDate:toDateStr(inTwoDays),
+      autoWeatherTags:[],
+      weatherKnown:false,
+      customItems:[]            // belongs to the trip; copied into the next new trip
+    };
+
+    // Custom items are saved on the current trip
+    function saveCustomItems() {
+      const t = findTrip(state.tripId);
+      if (!t) return;            // a draft trip saves them when it's first saved
+      t.customItems = state.customItems;
+      t.updatedAt = Date.now();
+      saveTrips();
+    }
+
+    // ---- Saved trips ----
+    const TRIPS_KEY = 'packing_trips_v1';
+    const TRIP_FIELDS = ['adultCount','adultAge','childCount','childAge','gender','dest','startDate','endDate','remindDays','remindTime','autoWeatherTags','weatherKnown','customItems'];
+    let trips = [];
+    try {
+      trips = JSON.parse(storage.getItem(TRIPS_KEY) || '[]');
+      if (!Array.isArray(trips)) trips = [];
+    } catch (e) { trips = []; }
+    // Bring over the single trip saved by the previous version (its ticks were keyed "dest_startDate")
+    try {
+      const old = JSON.parse(storage.getItem('packing_trip_v1') || 'null');
+      if (old && old.dest && !trips.length) {
+        trips.push({ ...old, id: `${old.dest.id}_${old.startDate}`, remind: true });
+        storage.setItem(TRIPS_KEY, JSON.stringify(trips));
+      }
+      storage.removeItem('packing_trip_v1');
+    } catch (e) {}
+
+    // Older versions kept one shared list of custom items; give each trip its own copy
+    try {
+      const legacy = JSON.parse(storage.getItem('packing_custom_items') || '[]');
+      if (Array.isArray(legacy)) trips.forEach(t => { if (!Array.isArray(t.customItems)) t.customItems = legacy.map(c => ({ ...c })); });
+      if (trips.length) storage.setItem(TRIPS_KEY, JSON.stringify(trips));
+      storage.removeItem('packing_custom_items');
+    } catch (e) {}
+
+    const saveTrips = () => storage.setItem(TRIPS_KEY, JSON.stringify(trips));
+    const findTrip  = id => trips.find(t => t.id === id);
+    const tripEnded = t => new Date(t.endDate + 'T00:00:00') < today;
+
+    function tripFromState() {
+      const t = { id: state.tripId, tripTypes: [...state.tripTypes] };
+      TRIP_FIELDS.forEach(k => { t[k] = state[k]; });
+      return t;
+    }
+    function applyTrip(t) {
+      TRIP_FIELDS.forEach(k => { if (t[k] !== undefined) state[k] = t[k]; });
+      state.tripTypes = new Set(t.tripTypes || []);
+      state.tripId = t.id;
+      state.autoWeatherTags = t.autoWeatherTags || [];
+      state.weatherKnown = !!t.weatherKnown;
+      state.customItems = Array.isArray(t.customItems) ? t.customItems : [];
+      state.remindDays = reminderDaysOf(t);
+      state.remindTime = t.remindTime || '20:00';
+    }
+    // Trips saved before reminders were flexible had a single on/off "remind" flag
+    const reminderDaysOf = t => Array.isArray(t.remindDays) ? t.remindDays : (t.remind === false ? [] : [1]);
+    // Create or update the trip being edited/viewed
+    function saveTrip() {
+      if (!state.tripId) state.tripId = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const t = tripFromState();
+      t.updatedAt = Date.now();
+      const i = trips.findIndex(x => x.id === t.id);
+      if (i >= 0) trips[i] = t; else trips.push(t);
+      saveTrips();
+      storage.setItem('last_trip', t.id);
+      scheduleReminder(t, null, true);
+    }
+
+    // Ticks, quantities and removed items all belong to one trip
+    const tripKey = () => state.tripId || 'draft';
+
+    // ================================================================
+    // 3. HELPERS
+    // ================================================================
+    const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function ageGroup(age) {
+      if (age <= 2) return 'baby';
+      if (age <= 12) return 'child';
+      if (age <= 59) return 'adult';
+      return 'senior';
+    }
+
+    function calcDays() {
+      const s = new Date(state.startDate + 'T00:00:00');
+      const e = new Date(state.endDate + 'T00:00:00');
+      if (isNaN(s) || isNaN(e)) return 1;
+      const diff = Math.round((e-s)/86400000) + 1;
+      return Math.max(1, Math.min(60, diff));
+    }
+
+    function buildMembers() {
+      const list = [];
+      for (let i=0;i<state.adultCount;i++){
+        const g = state.gender==='mixed' ? (i%2===0?'female':'male') : state.gender;
+        list.push({ role:'adult', age:state.adultAge, ageGroup:ageGroup(state.adultAge), gender:g });
+      }
+      for (let i=0;i<state.childCount;i++){
+        const g = state.gender==='mixed' ? (i%2===0?'female':'male') : state.gender;
+        list.push({ role:'child', age:state.childAge, ageGroup:ageGroup(state.childAge), gender:g });
+      }
+      return list;
+    }
+
+    // Tags that drive the rules: trip types + abroad/altitude + typical climate (only if weather is unknown)
+    function destTags() {
+      const d = state.dest || {};
+      const t = new Set();
+      (d.tags || []).forEach(tag => { if (tag === 'plateau' || !state.weatherKnown) t.add(tag); });
+      state.tripTypes.forEach(x => { t.add(x); if (x === 'ski') t.add('snow'); });
+      if (d.cc && HOME_COUNTRY && d.cc !== HOME_COUNTRY) t.add('abroad');
+      if ((d.elevation || 0) >= 2500) t.add('plateau');
+      return t;
+    }
+
+    function dateRangeText(sd = state.startDate, ed = state.endDate) {
+      const s = new Date(sd + 'T00:00:00');
+      const e = new Date(ed + 'T00:00:00');
+      if (isNaN(s) || isNaN(e)) return '';
+      const f = d => `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+      return sd === ed ? f(s) : `${f(s)} – ${f(e)}`;
+    }
+
+    function peopleText() {
+      return `${state.adultCount} adult${state.adultCount>1?'s':''}`
+           + (state.childCount ? `, ${state.childCount} child${state.childCount>1?'ren':''}` : '');
+    }
+
+    let toastTimer, toastUndo = null;
+    function toast(msg, undo, ms) {
+      const el = document.getElementById('toast');
+      el.innerHTML = `<span>${escapeHtml(msg)}</span>${undo ? '<button class="toast-undo" id="toastUndo">Undo</button>' : ''}`;
+      toastUndo = undo || null;
+      el.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.hidden = true; toastUndo = null; }, ms || (undo ? 5000 : 2600));
+    }
+    document.getElementById('toast').addEventListener('click', e => {
+      if (e.target.id !== 'toastUndo' || !toastUndo) return;
+      const fn = toastUndo;
+      toastUndo = null;
+      document.getElementById('toast').hidden = true;
+      fn();
+    });
+
+    // ================================================================
+    // 4. WEATHER (Open-Meteo: live forecast, or last year's weather for far-off trips)
+    // ================================================================
+    const weatherStatusEl = document.getElementById('weatherStatus');
+    const weatherDaysEl   = document.getElementById('weatherDays');
+    const weatherTagsEl   = document.getElementById('weatherTags');
+    let weatherRequestId = 0;
+
+    function weatherInfo(code) {
+      if (code === 0) return { icon:'☀️', desc:'Clear' };
+      if (code <= 2)  return { icon:'🌤️', desc:'Partly cloudy' };
+      if (code === 3) return { icon:'☁️', desc:'Overcast' };
+      if (code <= 48) return { icon:'🌫️', desc:'Fog' };
+      if (code <= 57) return { icon:'🌦️', desc:'Drizzle' };
+      if (code <= 67) return { icon:'🌧️', desc:'Rain' };
+      if (code <= 77) return { icon:'🌨️', desc:'Snow' };
+      if (code <= 82) return { icon:'🌧️', desc:'Showers' };
+      if (code <= 86) return { icon:'🌨️', desc:'Snow showers' };
+      if (code <= 99) return { icon:'⛈️', desc:'Thunderstorm' };
+      return { icon:'🌡️', desc:'—' };
+    }
+
+    function inferWeatherTags(days) {
+      if (!days || days.length === 0) return [];
+      const tags = new Set();
+      let sumMax=0, sumMin=0, rainy=0, snowy=0, clear=0;
+      days.forEach(d => {
+        sumMax += d.tmax; sumMin += d.tmin;
+        if (d.code <= 2) clear++;
+        if ((d.code >= 71 && d.code <= 77) || (d.code >= 85 && d.code <= 86)) snowy++;
+        else if ((d.code >= 51 && d.code <= 67) || (d.code >= 80 && d.code <= 82) || d.precip >= 50 || d.rainMm >= 2) rainy++;
+      });
+      const avgMax = sumMax/days.length;
+      const avgMin = sumMin/days.length;
+      if (avgMax >= 28) tags.add('hot');
+      if (avgMin <= 5) tags.add('cold');
+      if (snowy > 0) tags.add('snowy');
+      if (rainy >= Math.max(1, days.length/2)) tags.add('rainy');
+      if (clear >= days.length/2) tags.add('sunny');
+      if (avgMax >= 20 && avgMax < 28 && avgMin >= 5 && avgMin <= 22) tags.add('mild');
+      if (avgMax - avgMin >= 12) tags.add('windy');
+      return Array.from(tags);
+    }
+
+    function setWeatherStatus(kind, msg) {
+      weatherStatusEl.className = 'weather-status';
+      if (kind === 'idle') {
+        weatherStatusEl.innerHTML = `<span>Pick a destination to see the weather.</span>`;
+      } else if (kind === 'loading') {
+        weatherStatusEl.innerHTML = `<div class="spinner"></div><span>Fetching weather…</span>`;
+      } else if (kind === 'ok') {
+        weatherStatusEl.innerHTML = `<span style="color:#22c55e;">●</span><span>Forecast by Open-Meteo</span>`;
+      } else if (kind === 'typical') {
+        weatherStatusEl.innerHTML = `<span style="color:var(--sky);">●</span><span>Last year’s weather on these dates</span>`;
+      } else if (kind === 'unavailable') {
+        weatherStatusEl.innerHTML = `<span style="color:#f59e0b;">⚠</span><span>${msg||'Forecast unavailable'}</span>`;
+      } else if (kind === 'error') {
+        weatherStatusEl.innerHTML = `<span>Could not load weather — using typical climate instead.</span>`;
+        weatherStatusEl.className = 'weather-error';
+      }
+    }
+
+    function shiftYear(dateStr, n) {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setFullYear(d.getFullYear() + n);
+      return toDateStr(d);
+    }
+
+    function clearWeather() {
+      state.autoWeatherTags = [];
+      state.weatherKnown = false;
+      weatherDaysEl.innerHTML = '';
+      weatherTagsEl.innerHTML = '';
+    }
+
+    async function fetchWeather() {
+      const dest = state.dest;
+      if (!dest || dest.lat == null) {
+        weatherRequestId++;
+        clearWeather();
+        setWeatherStatus('idle');
+        return;
+      }
+
+      const reqId = ++weatherRequestId;
+      setWeatherStatus('loading');
+
+      const maxDate = new Date(today); maxDate.setDate(maxDate.getDate() + 15);
+      const start = new Date(state.startDate + 'T00:00:00');
+      const end   = new Date(state.endDate + 'T00:00:00');
+
+      if (isNaN(start) || isNaN(end)) {
+        setWeatherStatus('unavailable', 'Invalid travel dates.');
+        clearWeather(); regenerate();
+        return;
+      }
+
+      // Within the 16-day window → live forecast. Otherwise → what the weather was on these dates last year.
+      let url, typical = false, yearShift = 0;
+      const daily = 'weather_code,temperature_2m_max,temperature_2m_min';
+      if (start <= maxDate && end >= today) {
+        const s = toDateStr(start < today ? today : start);
+        const e = toDateStr(end > maxDate ? maxDate : end);
+        url = `https://api.open-meteo.com/v1/forecast?latitude=${dest.lat}&longitude=${dest.lon}`
+            + `&daily=${daily},precipitation_probability_max&timezone=auto&start_date=${s}&end_date=${e}`;
+      } else {
+        typical = true;
+        yearShift = end < today ? 0 : -1;
+        const capEnd = new Date(start); capEnd.setDate(capEnd.getDate() + 15);
+        const s = shiftYear(state.startDate, yearShift);
+        const e = shiftYear(toDateStr(end > capEnd ? capEnd : end), yearShift);
+        url = `https://archive-api.open-meteo.com/v1/archive?latitude=${dest.lat}&longitude=${dest.lon}`
+            + `&daily=${daily},precipitation_sum&timezone=auto&start_date=${s}&end_date=${e}`;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (reqId !== weatherRequestId) return;
+
+        const d = data.daily;
+        const days = [];
+        for (let i = 0; i < d.time.length; i++) {
+          if (d.temperature_2m_max[i] == null) continue;
+          days.push({
+            date: shiftYear(d.time[i], -yearShift),
+            code: d.weather_code[i] ?? 0,
+            tmax: Math.round(d.temperature_2m_max[i]),
+            tmin: Math.round(d.temperature_2m_min[i]),
+            precip: d.precipitation_probability_max?.[i] ?? 0,
+            rainMm: d.precipitation_sum?.[i] ?? 0
+          });
+        }
+        if (!days.length) throw new Error('No data');
+        renderWeatherCards(days);
+        state.autoWeatherTags = inferWeatherTags(days);
+        state.weatherKnown = true;
+        setWeatherStatus(typical ? 'typical' : 'ok');
+        renderWeatherTags(state.autoWeatherTags);
+        // Remember it on the saved trip so the list stays the same offline
+        const t = findTrip(state.tripId);
+        if (t && t.dest.id === state.dest.id) { t.autoWeatherTags = state.autoWeatherTags; t.weatherKnown = true; saveTrips(); }
+        regenerate();
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (reqId !== weatherRequestId) return;
+        console.error('Weather fetch failed:', err);
+        const t = findTrip(state.tripId);
+        if (t && t.weatherKnown && t.dest.id === state.dest.id && t.startDate === state.startDate) {
+          state.autoWeatherTags = t.autoWeatherTags || [];
+          state.weatherKnown = true;
+          setWeatherStatus('unavailable', 'Offline — using the last forecast we saved.');
+          renderWeatherTags(state.autoWeatherTags);
+        } else {
+          setWeatherStatus('error');
+          clearWeather();
+        }
+        regenerate();
+      }
+    }
+
+    function renderWeatherCards(days) {
+      if (!days.length) { weatherDaysEl.innerHTML = ''; return; }
+      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      weatherDaysEl.innerHTML = days.map(d => {
+        const dt = new Date(d.date + 'T00:00:00');
+        const info = weatherInfo(d.code);
+        const dateLabel = `${dayNames[dt.getDay()]} ${dt.getMonth()+1}/${dt.getDate()}`;
+        const wet = d.precip >= 20 ? `💧${d.precip}%` : d.rainMm >= 1 ? `💧${Math.round(d.rainMm)}mm` : '';
+        return `
+          <div class="weather-day" title="${info.desc}">
+            <div class="wd-date">${dateLabel}</div>
+            <div class="wd-icon">${info.icon}</div>
+            <div class="wd-temp">${d.tmax}° <span>${d.tmin}°</span></div>
+            ${wet ? `<div class="wd-precip">${wet}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    const WEATHER_LABELS = { hot:'Hot', cold:'Cold', rainy:'Rainy', snowy:'Snowy', sunny:'Sunny', windy:'Big temp swing', mild:'Mild' };
+    function renderWeatherTags(tags) {
+      weatherTagsEl.innerHTML = tags.map(t => `<span class="weather-tag">${WEATHER_LABELS[t] || t}</span>`).join('');
+    }
+
+    // ================================================================
+    // 5. GENERATE
+    // ================================================================
+    function generate() {
+      const dest = state.dest;
+      const days = calcDays();
+      const members = buildMembers();
+      const tags = Array.from(destTags());
+      const itemMap = {};
+
+      const makeCtx = m => ({
+        days,
+        tags,
+        weather: state.autoWeatherTags || [],
+        age: m.age,
+        ageGroup: m.ageGroup,
+        gender: m.gender,
+        role: m.role
+      });
+
+      members.forEach(m => {
+        const mctx = makeCtx(m);
+        RULES.forEach(r => {
+          if (r.perTrip) return;
+          if (r.cond(mctx)) {
+            const q = r.qty(mctx);
+            if (q > 0) {
+              if (!itemMap[r.id]) itemMap[r.id] = { id:r.id, name:r.name, cat:r.cat, qty:0 };
+              itemMap[r.id].qty += q;
+            }
+          }
+        });
+      });
+
+      RULES.filter(r => r.perTrip).forEach(r => {
+        for (const m of members) {
+          const mctx = makeCtx(m);
+          if (r.cond(mctx)) {
+            const q = r.qty(mctx);
+            if (q > 0) itemMap[r.id] = { id:r.id, name:r.name, cat:r.cat, qty:q };
+            break;
+          }
+        }
+      });
+
+      const customItems = Array.isArray(state.customItems) ? state.customItems : [];
+      customItems.forEach(ci => {
+        itemMap[ci.id] = { id:ci.id, name:ci.name, cat:ci.cat, qty:1, isCustom:true };
+      });
+
+      const hidden = new Set(getHidden());
+      const allItems = Object.values(itemMap);
+      const items = allItems.filter(it => !hidden.has(it.id));
+      const qtyOverride = getQtyMap();
+      items.forEach(it => {
+        if (qtyOverride[it.id]) { it.autoQty = it.qty; it.qty = qtyOverride[it.id]; }
+      });
+      const groups = {};
+      items.forEach(it => {
+        if (!groups[it.cat]) groups[it.cat] = [];
+        groups[it.cat].push(it);
+      });
+
+      const ordered = [];
+      CAT_ORDER.forEach(cat => {
+        if (groups[cat]) { ordered.push({ cat, items:groups[cat] }); delete groups[cat]; }
+      });
+      Object.keys(groups).forEach(cat => ordered.push({ cat, items:groups[cat] }));
+
+      return { dest, groups: ordered, total: items.length, days, hiddenCount: allItems.length - items.length };
+    }
+
+    // ================================================================
+    // 6. RENDER RESULT — focus mode (one category at a time) or full list
+    // ================================================================
+    const resultEl = document.getElementById('result');
+    // "Often forgotten": a few sensible defaults, then whatever you mark/unmark by swiping right.
+    // Your choices apply to every trip.
+    const OFTEN_FORGOT = new Set(['charger','powerbank','adapter','copies','sunscreen','toothbrush','medicine','umbrella','sunglasses','lipbalm','earphone']);
+    const RING_C = 2 * Math.PI * 38;
+    const CHECK_SVG = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+    const SLIDERS_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg>';
+    const LIST_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>';
+    const FOCUS_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>';
+    const SHARE_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/></svg>';
+    const IMAGE_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>';
+
+    function getForgotFlags() {
+      try { return JSON.parse(storage.getItem('forgot_flags') || '{}') || {}; } catch (e) { return {}; }
+    }
+    function isForgot(id) {
+      const f = getForgotFlags();
+      return id in f ? !!f[id] : OFTEN_FORGOT.has(id);
+    }
+    function toggleForgot(id) {
+      const f = getForgotFlags(), now = !isForgot(id);
+      f[id] = now;
+      storage.setItem('forgot_flags', JSON.stringify(f));
+      haptic('light');
+      const name = lastData.groups.flatMap(g => g.items).find(i => i.id === id)?.name || 'Item';
+      renderResult(lastData);
+      toast(now ? `“${name}” marked as often forgotten` : `“${name}” unmarked`);
+    }
+
+    let lastData = null;
+    let view = 'focus';      // 'focus' | 'full'
+    let focusCat;            // category in focus; undefined = pick automatically, null = all-done screen
+    let addingCat = null;     // category whose "add an item" box is open
+
+    const addRowHtml = () => `
+      <div class="add-row">
+        <input type="text" id="addInput" class="text-input" placeholder="e.g. Kindle, glasses…" />
+        <button class="add-btn" id="addConfirm">Add</button>
+      </div>`;
+
+    const packKey   = id => `pack_${tripKey()}_${id}`;
+    const isPacked  = id => storage.getItem(packKey(id)) === 'true';
+    const setPacked = (id, v) => v ? storage.setItem(packKey(id), 'true') : storage.removeItem(packKey(id));
+    let hidePacked  = storage.getItem('pref_hide_packed') === 'true';
+
+    function getHidden() {
+      try {
+        const a = JSON.parse(storage.getItem('hidden_' + tripKey()) || '[]');
+        return Array.isArray(a) ? a : [];
+      } catch (e) { return []; }
+    }
+    const setHidden = a => storage.setItem('hidden_' + tripKey(), JSON.stringify(a));
+
+    // Quantities you changed by hand (id → qty); anything not here uses the automatic count
+    function getQtyMap() {
+      try {
+        const m = JSON.parse(storage.getItem('qty_' + tripKey()) || '{}');
+        return m && typeof m === 'object' ? m : {};
+      } catch (e) { return {}; }
+    }
+    const setQtyMap = m => storage.setItem('qty_' + tripKey(), JSON.stringify(m));
+    let editingQty = null;   // id of the item whose stepper is open
+
+    function changeQty(id, delta) {
+      const it = lastData.groups.flatMap(g => g.items).find(i => i.id === id);
+      if (!it) return;
+      const auto = it.autoQty ?? it.qty;
+      const q = Math.max(1, Math.min(99, it.qty + delta));
+      const m = getQtyMap();
+      if (q === auto) delete m[id]; else m[id] = q;
+      setQtyMap(m);
+      haptic('light');
+      regenerate();
+    }
+    const catDone   = g => g.items.every(it => isPacked(it.id));
+
+    // Next unfinished category after i (wrapping round to skipped ones).
+    // When everything is packed, just step forward so the list can be reviewed.
+    function nextIndex(groups, i) {
+      for (let k = 1; k < groups.length; k++) {
+        const j = (i + k) % groups.length;
+        if (!catDone(groups[j])) return j;
+      }
+      return groups.every(catDone) && i < groups.length - 1 ? i + 1 : -1;
+    }
+
+    // Big countdown on the list screen ("9 days to go" / "Departs Thu, Oct 24")
+    function countdown() {
+      const s = new Date(state.startDate + 'T00:00:00');
+      const e = new Date(state.endDate + 'T00:00:00');
+      if (isNaN(s) || isNaN(e)) return { big: '', small: '' };
+      const f = d => `${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+      const diff = Math.round((s - today) / 86400000);
+      if (diff > 1)   return { big: `${diff} days to go`, small: `Departs ${f(s)}` };
+      if (diff === 1) return { big: 'Leaving tomorrow', small: `Departs ${f(s)}` };
+      if (diff === 0) return { big: 'Leaving today', small: `Departs ${f(s)}` };
+      if (e >= today) return { big: 'On the trip', small: `Back ${f(e)}` };
+      return { big: 'Trip done', small: `Ended ${f(e)}` };
+    }
+
+    function focusIndex(groups) {
+      if (focusCat === null) return -1;
+      let idx = groups.findIndex(g => g.cat === focusCat);
+      if (idx < 0) {
+        idx = groups.findIndex(g => !catDone(g));
+        focusCat = idx >= 0 ? groups[idx].cat : null;
+      }
+      return idx;
+    }
+
+    // Each row sits on top of two swipe actions: swipe right = often forgotten, swipe left = delete
+    function itemRow(it, full) {
+      const done = isPacked(it.id), forgot = isForgot(it.id);
+      const qty = editingQty === it.id
+        ? `<span class="stepper"><button data-qty="-1" data-qid="${it.id}" aria-label="Fewer">−</button><span>${it.qty}</span><button data-qty="1" data-qid="${it.id}" aria-label="More">+</button></span>`
+        : (it.qty > 1 || full) ? `<button class="qty-pill ${it.qty === 1 ? 'one' : ''}" data-qedit="${it.id}" aria-label="Change quantity">×${it.qty}</button>` : '';
+      return `
+        <div class="swipe-wrap">
+          <div class="swipe-act left">★ ${forgot ? 'Not often forgotten' : 'Often forgotten'}</div>
+          <div class="swipe-act right">Delete</div>
+          <div class="f-item ${done?'done':''}" role="checkbox" tabindex="0" aria-checked="${done}" data-id="${it.id}">
+            <span class="f-check">${CHECK_SVG}</span>
+            <span class="f-name">${escapeHtml(it.name)}</span>
+            <span class="f-right">
+              ${forgot ? '<span class="tag-forget">Often forgotten</span>' : ''}
+              ${qty}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderResult(data) {
+      try {
+        lastData = data;
+        const { dest, groups, total, days } = data;
+        const packed = groups.reduce((n, g) => n + g.items.filter(it => isPacked(it.id)).length, 0);
+        const pct = total > 0 ? Math.round(packed / total * 100) : 0;
+        const full = view === 'full';
+        const idx = full ? 0 : focusIndex(groups);
+        const allDone = total > 0 && packed === total;
+
+        const cd = countdown();
+        const pcTitle = !full && idx < 0 && total ? 'You’re all packed' : `${packed} of ${total} packed`;
+
+        let html = `
+          <div class="top-nav">
+            <button class="back-pill glass" id="homeBtn">‹ My Trips</button>
+            <div class="head-btns">
+              <button class="icon-btn glass" id="viewToggleBtn" aria-label="${full ? 'Focus mode' : 'Full list'}">${full ? FOCUS_SVG : LIST_SVG}</button>
+              <button class="icon-btn glass" id="editTripBtn" aria-label="Edit trip">${SLIDERS_SVG}</button>
+            </div>
+          </div>
+          <div class="s2-head">
+            <div>
+              <div class="countdown"><span class="cd-big">${cd.big}</span><span class="cd-small">${cd.small}</span></div>
+              <div class="s2-title">${escapeHtml(dest.name)} · ${days} day${days>1?'s':''}</div>
+            </div>
+          </div>
+          <div class="progress-card glass">
+            <div class="ring">
+              <svg viewBox="0 0 88 88">
+                <circle class="ring-bg" cx="44" cy="44" r="38"/>
+                <circle class="ring-fg" cx="44" cy="44" r="38"
+                  stroke-dasharray="${RING_C}" stroke-dashoffset="${RING_C * (1 - pct/100)}"/>
+              </svg>
+              <span>${pct}%</span>
+            </div>
+            <div>
+              <div class="pc-title">${pcTitle}</div>
+            </div>
+          </div>
+        `;
+
+        if (groups.length === 0) {
+          html += `<div class="empty">Nothing on the list yet. Try changing your trip details.</div>`;
+        } else if (full) {
+          html += `
+            <div class="share-row">
+              <button class="ghost-btn glass" id="shareTextBtn">${SHARE_SVG} Share list</button>
+              <button class="ghost-btn glass" id="saveImgBtn">${IMAGE_SVG} Save as image</button>
+            </div>
+            <div class="bulk-row">
+              <button class="text-btn" id="hidePackedBtn" style="margin-right:auto">${hidePacked ? 'Show packed' : 'Hide packed'}</button>
+              <button class="sel-pill solid" id="selectAllBtn" ${allDone ? 'disabled' : ''}>✓ Select all</button>
+              <button class="sel-pill" id="deselectAllBtn" ${packed === 0 ? 'disabled' : ''}>Deselect all</button>
+            </div>
+          `;
+          groups.forEach(g => {
+            const n = g.items.filter(it => isPacked(it.id)).length;
+            const rows = hidePacked ? g.items.filter(it => !isPacked(it.id)) : g.items;
+            html += `
+              <div class="cat-card glass">
+                <div class="cat-head"><span>${CAT_ICON[g.cat] || '📦'} ${escapeHtml(g.cat)}</span><span class="cat-count">${n}/${g.items.length}</span></div>
+                ${rows.length ? rows.map(it => itemRow(it, true)).join('') : '<div class="cat-done-line">All packed ✓</div>'}
+                ${addingCat === g.cat ? addRowHtml() : `<button class="cat-add" data-addcat="${escapeHtml(g.cat)}">+ Add item</button>`}
+              </div>
+            `;
+          });
+          if (data.hiddenCount) {
+            html += `<button class="skip-link" id="restoreHiddenBtn">Bring back ${data.hiddenCount} removed item${data.hiddenCount>1?'s':''}</button>`;
+          }
+          html += `<button class="skip-link" id="focusModeBtn">← Back to one category at a time</button>`;
+        } else if (idx < 0) {
+          html += `
+            <div class="done-state">
+              <div class="done-emoji">🎉</div>
+              <div class="done-title">All packed!</div>
+              <div class="done-sub">Enjoy ${escapeHtml(dest.name)}!</div>
+            </div>
+            <button class="primary-btn" id="reviewBtn">Review the full list</button>
+            <button class="skip-link" id="addForgotBtn">+ Forgot something? Add it</button>
+          `;
+        } else {
+          const g = groups[idx];
+          const next = nextIndex(groups, idx);
+          html += `
+            <div class="focus-body">
+              <div class="focus-meta"><span>Category ${idx+1} of ${groups.length}</span></div>
+              <div class="focus-title-row">
+                <h2 class="focus-title">${escapeHtml(g.cat)}</h2>
+                <button class="sel-pill ${catDone(g) ? '' : 'solid'}" id="catToggleBtn">${catDone(g) ? 'Deselect all' : '✓ Select all'}</button>
+              </div>
+              ${g.items.map(it => itemRow(it)).join('')}
+          `;
+          html += addingCat === g.cat
+            ? addRowHtml()
+            : `<button class="f-add" data-addcat="${escapeHtml(g.cat)}">+ Add an item to ${escapeHtml(g.cat)}</button>`;
+          html += `
+              <div class="bar-spacer"></div>
+            </div>
+            <div class="bottom-bar"><div class="bottom-inner">
+              <button class="primary-btn" id="primaryBtn" data-next="${next}">
+                ${next >= 0 ? `${escapeHtml(groups[next].cat)} →` : (allDone ? 'See the full list →' : 'All done ✓')}
+              </button>
+              ${next >= 0 && !catDone(g) ? `<button class="skip-link" id="skipBtn" data-next="${next}">Skip for now</button>` : ''}
+            </div></div>
+          `;
+        }
+
+        resultEl.innerHTML = html;
+        // Keep tomorrow-night's reminder up to date with how much is left
+        if (route === 'list' && state.tripId) {
+          clearTimeout(remindTimer);
+          const left = total - packed, id = state.tripId;
+          remindTimer = setTimeout(() => { const t = findTrip(id); if (t) scheduleReminder(t, left, false); }, 1500);
+        }
+        if (addingCat) document.getElementById('addInput')?.focus();
+      } catch (e) {
+        console.error('renderResult error:', e);
+        resultEl.innerHTML = `<div class="empty" style="color:#ef4444;">Couldn’t show your list. Please try again.</div>`;
+      }
+    }
+
+    function goToCategory(i) {
+      view = 'focus';
+      focusCat = i >= 0 ? lastData.groups[i].cat : null;
+      addingCat = null;
+      renderResult(lastData);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setView(v) {
+      view = v;
+      addingCat = null;
+      if (v === 'focus') focusCat = undefined;
+      renderResult(lastData);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function haptic(kind) {
+      const H = nativePlugins()?.Haptics;
+      if (!H) return;
+      (kind === 'success' ? H.notification({ type: 'SUCCESS' }) : H.impact({ style: 'LIGHT' })).catch(() => {});
+    }
+
+    // Bulk tick/untick, with Undo so one stray tap can't wipe your progress
+    function setAllPacked(groups, v, label) {
+      const ids = groups.flatMap(g => g.items.map(it => it.id));
+      const before = new Set(ids.filter(isPacked));
+      ids.forEach(id => setPacked(id, v));
+      renderResult(lastData);
+      haptic(v ? 'success' : 'light');
+      toast(v ? `Marked ${label} as packed` : `Cleared ${label}`, () => {
+        ids.forEach(id => setPacked(id, before.has(id)));
+        renderResult(lastData);
+      });
+    }
+
+    function toggleItem(el) {
+      const id = el.dataset.id, nowPacked = !isPacked(id);
+      setPacked(id, nowPacked);
+      const g = lastData.groups.find(g => g.items.some(it => it.id === id));
+      haptic(nowPacked && g && catDone(g) ? 'success' : 'light');
+      renderResult(lastData);
+    }
+
+    // Swipe left removes an item from this trip's list (custom items are deleted), with Undo
+    function removeItem(id) {
+      const name = lastData.groups.flatMap(g => g.items).find(i => i.id === id)?.name || 'item';
+      const i = state.customItems.findIndex(c => c.id === id);
+      if (i >= 0) {
+        const [custom] = state.customItems.splice(i, 1);
+        saveCustomItems();
+        regenerate();
+        toast(`Removed “${name}”`, () => { state.customItems.splice(i, 0, custom); saveCustomItems(); regenerate(); });
+      } else {
+        setHidden([...getHidden(), id]);
+        regenerate();
+        toast(`Removed “${name}”`, () => { setHidden(getHidden().filter(x => x !== id)); regenerate(); });
+      }
+    }
+
+    function addCustomItem() {
+      const input = document.getElementById('addInput');
+      const name = input ? input.value.trim() : '';
+      const cat = addingCat;
+      addingCat = null;
+      if (name && cat) {
+        const id = 'custom_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+        state.customItems.push({ id, name, cat });
+        saveCustomItems();
+      }
+      regenerate();
+    }
+
+    resultEl.addEventListener('click', e => {
+      if (suppressClick) return;   // the tap that ended a swipe isn't a tick
+      const t = e.target;
+      // Quantity stepper: tap the ×N pill to open it, tap anywhere else to close it
+      const qb = t.closest('[data-qty]');
+      if (qb) return changeQty(qb.dataset.qid, Number(qb.dataset.qty));
+      if (t.closest('.stepper')) return;
+      const qe = t.closest('[data-qedit]');
+      if (qe) { editingQty = qe.dataset.qedit; return renderResult(lastData); }
+      if (editingQty) { editingQty = null; return renderResult(lastData); }
+
+      const item = t.closest('.f-item');
+      if (item) return toggleItem(item);
+      if (t.closest('#homeBtn'))       return history.back();
+      if (t.closest('#editTripBtn'))   { editReturnsToList = true; refreshStep1(); location.hash = 'edit'; return; }
+      if (t.closest('#viewToggleBtn')) return setView(view === 'full' ? 'focus' : 'full');
+      if (t.closest('#focusModeBtn'))  return setView('focus');
+      if (t.closest('#reviewBtn'))     return setView('full');
+      if (t.closest('#shareTextBtn'))  return shareText();
+      if (t.closest('#saveImgBtn'))    return saveImage();
+      if (t.closest('#selectAllBtn'))   return setAllPacked(lastData.groups, true, 'everything');
+      if (t.closest('#deselectAllBtn')) return setAllPacked(lastData.groups, false, 'everything');
+      if (t.closest('#catToggleBtn')) {
+        const g = lastData.groups.find(g => g.cat === focusCat);
+        return g && setAllPacked([g], !catDone(g), g.cat);
+      }
+      if (t.closest('#hidePackedBtn')) {
+        hidePacked = !hidePacked;
+        storage.setItem('pref_hide_packed', hidePacked);
+        return renderResult(lastData);
+      }
+      if (t.closest('#restoreHiddenBtn')) {
+        setHidden([]);
+        regenerate();
+        return toast('Removed items are back');
+      }
+      const addBtn = t.closest('[data-addcat]');
+      if (addBtn) { addingCat = addBtn.dataset.addcat; return renderResult(lastData); }
+      if (t.closest('#addForgotBtn'))  return setView('full');
+      if (t.closest('#addConfirm'))    return addCustomItem();
+      if (t.closest('#skipBtn'))       return goToCategory(Number(t.closest('#skipBtn').dataset.next));
+      const primary = t.closest('#primaryBtn');
+      if (primary) {
+        const g = lastData.groups.find(g => g.cat === focusCat);
+        if (g) g.items.forEach(it => setPacked(it.id, true));
+        const next = Number(primary.dataset.next);
+        if (next < 0 && lastData.groups.every(catDone) && focusCat === lastData.groups[lastData.groups.length-1].cat) return setView('full');
+        goToCategory(next);
+      }
+    });
+
+    // ---- Swipe gestures on item rows ----
+    const SWIPE_AT = 80;   // px to trigger an action
+    let swipe = null, suppressClick = false;
+
+    function resetSwipe(row) {
+      row.style.transition = 'transform 0.2s ease';
+      row.style.transform = '';
+      row.parentElement.classList.remove('swiping', 'show-left', 'armed');
+    }
+    resultEl.addEventListener('pointerdown', e => {
+      const row = e.target.closest('.f-item');
+      if (!row || e.target.closest('button, input')) return;
+      swipe = { row, x: e.clientX, y: e.clientY, dx: 0, active: false, pid: e.pointerId };
+    });
+    resultEl.addEventListener('pointermove', e => {
+      if (!swipe || e.pointerId !== swipe.pid) return;
+      const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+      if (!swipe.active) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; }   // it's a scroll
+        if (Math.abs(dx) < 10) return;
+        swipe.active = true;
+        try { swipe.row.setPointerCapture(e.pointerId); } catch (err) {}
+        swipe.row.parentElement.classList.add('swiping');
+      }
+      swipe.dx = dx;
+      const wrap = swipe.row.parentElement;
+      swipe.row.style.transition = 'none';
+      swipe.row.style.transform = `translateX(${dx}px)`;
+      wrap.classList.toggle('show-left', dx > 0);
+      const armed = Math.abs(dx) >= SWIPE_AT;
+      if (armed && !wrap.classList.contains('armed')) haptic('light');
+      wrap.classList.toggle('armed', armed);
+    });
+    resultEl.addEventListener('pointerup', () => {
+      if (!swipe) return;
+      const { row, dx, active } = swipe;
+      swipe = null;
+      if (!active) return;
+      suppressClick = true;
+      setTimeout(() => { suppressClick = false; }, 60);
+      const id = row.dataset.id;
+      if (dx <= -SWIPE_AT) {
+        row.style.transition = 'transform 0.18s ease';
+        row.style.transform = 'translateX(-110%)';
+        setTimeout(() => removeItem(id), 170);
+      } else if (dx >= SWIPE_AT) {
+        resetSwipe(row);
+        setTimeout(() => toggleForgot(id), 180);
+      } else {
+        resetSwipe(row);
+      }
+    });
+    resultEl.addEventListener('pointercancel', () => {
+      if (swipe && swipe.active) resetSwipe(swipe.row);
+      swipe = null;
+    });
+
+    resultEl.addEventListener('keydown', e => {
+      if (e.target.id === 'addInput') {
+        if (e.key === 'Enter')  { e.preventDefault(); addCustomItem(); }
+        if (e.key === 'Escape') { addingCat = null; renderResult(lastData); }
+      } else if (e.target.classList.contains('f-item') && (e.key === ' ' || e.key === 'Enter')) {
+        e.preventDefault();
+        toggleItem(e.target);
+      }
+    });
+
+    function regenerate() {
+      if (!state.dest) { resultEl.innerHTML = ''; return; }
+      try {
+        const data = generate();
+        renderResult(data);
+      } catch (e) {
+        console.error('regenerate error:', e);
+        resultEl.innerHTML = `<div class="empty" style="color:#ef4444;">Couldn’t load your list. Please try again.</div>`;
+      }
+    }
+
+    // ================================================================
+    // 7. SHARE / SAVE
+    // ================================================================
+    const nativePlugins = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins : null);
+    const isCancel = err => /cancel|abort/i.test(String(err?.message || err));
+
+    function listAsText(data) {
+      const { dest, groups, days } = data;
+      const lines = [
+        `🧳 Packing list · ${dest.name}${dest.country ? ', ' + dest.country : ''}`,
+        `${dateRangeText()} · ${days} day${days>1?'s':''} · ${peopleText()}`,
+        ''
+      ];
+      groups.forEach(g => {
+        lines.push(`${CAT_ICON[g.cat] || '📦'} ${g.cat}`);
+        g.items.forEach(it => lines.push(`${isPacked(it.id) ? '☑' : '☐'} ${it.name}${it.qty > 1 ? ' ×' + it.qty : ''}`));
+        lines.push('');
+      });
+      lines.push('Pack light, travel far.');
+      return lines.join('\n');
+    }
+
+    async function shareText() {
+      const text = listAsText(lastData);
+      const title = `Packing list · ${lastData.dest.name}`;
+      try {
+        const P = nativePlugins();
+        if (P?.Share) { await P.Share.share({ title, text, dialogTitle: 'Share packing list' }); return; }
+        if (navigator.share) { await navigator.share({ title, text }); return; }
+        await navigator.clipboard.writeText(text);
+        toast('List copied — paste it into any chat');
+      } catch (err) {
+        if (!isCancel(err)) { console.error('share failed', err); toast('Could not share the list'); }
+      }
+    }
+
+    // --- canvas drawing helpers ---
+    function rr(x, X, Y, w, h, r) {
+      x.beginPath();
+      x.moveTo(X + r, Y);
+      x.arcTo(X + w, Y, X + w, Y + h, r);
+      x.arcTo(X + w, Y + h, X, Y + h, r);
+      x.arcTo(X, Y + h, X, Y, r);
+      x.arcTo(X, Y, X + w, Y, r);
+      x.closePath();
+    }
+    function fit(x, text, max) {
+      if (x.measureText(text).width <= max) return text;
+      let t = text;
+      while (t.length > 1 && x.measureText(t + '…').width > max) t = t.slice(0, -1);
+      return t + '…';
+    }
+    function blob(x, cx, cy, r, color) {
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, color); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+
+    function listAsCanvas(data) {
+      const { dest, groups, days, total } = data;
+      const W = 1080, P = 64, ROW = 66, HEAD = 92, GAP = 26, TOP = 350;
+      const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      const packed = groups.reduce((n, g) => n + g.items.filter(it => isPacked(it.id)).length, 0);
+      let H = TOP + 90;
+      groups.forEach(g => { H += HEAD + g.items.length * ROW + 24 + GAP; });
+
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const x = c.getContext('2d');
+      const bg = x.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#EEF4F8'); bg.addColorStop(1, '#E3F2EF');
+      x.fillStyle = bg; x.fillRect(0, 0, W, H);
+      blob(x, 140, 90, 460, 'rgba(159,216,207,0.65)');
+      blob(x, W - 80, 300, 420, 'rgba(46,125,181,0.20)');
+      blob(x, W * 0.3, H - 200, 520, 'rgba(159,216,207,0.40)');
+
+      x.textBaseline = 'alphabetic';
+      x.fillStyle = '#2E7DB5'; x.font = `700 28px ${FONT}`;
+      x.fillText('PACKING LIST', P, 110);
+      x.fillStyle = '#0F2233'; x.font = `700 76px ${FONT}`;
+      x.fillText(fit(x, dest.name + (dest.country ? ', ' + dest.country : ''), W - 2 * P), P, 198);
+      x.fillStyle = '#5B6E7F'; x.font = `500 32px ${FONT}`;
+      x.fillText(fit(x, `${dateRangeText()} · ${days} day${days>1?'s':''} · ${peopleText()}`, W - 2 * P), P, 252);
+      x.fillStyle = '#2E7DB5'; x.font = `700 30px ${FONT}`;
+      x.fillText(`✓ ${packed} of ${total} packed`, P, 300);
+
+      let y = TOP;
+      groups.forEach(g => {
+        const h = HEAD + g.items.length * ROW + 24;
+        rr(x, P, y, W - 2 * P, h, 36);
+        x.fillStyle = 'rgba(255,255,255,0.72)'; x.fill();
+        x.strokeStyle = 'rgba(255,255,255,0.95)'; x.lineWidth = 2; x.stroke();
+
+        x.fillStyle = '#0F2233'; x.font = `700 36px ${FONT}`;
+        x.fillText(`${CAT_ICON[g.cat] || '📦'}  ${g.cat}`, P + 36, y + 64);
+        const n = g.items.filter(it => isPacked(it.id)).length;
+        x.textAlign = 'right'; x.fillStyle = '#5B6E7F'; x.font = `700 26px ${FONT}`;
+        x.fillText(`${n}/${g.items.length}`, W - P - 36, y + 62);
+        x.textAlign = 'left';
+
+        let iy = y + HEAD;
+        g.items.forEach(it => {
+          const cy = iy + ROW / 2, done = isPacked(it.id), bx = P + 54;
+          x.beginPath(); x.arc(bx, cy, 16, 0, Math.PI * 2);
+          if (done) {
+            x.fillStyle = '#2E7DB5'; x.fill();
+            x.strokeStyle = '#fff'; x.lineWidth = 4; x.lineCap = 'round'; x.lineJoin = 'round';
+            x.beginPath(); x.moveTo(bx - 8, cy); x.lineTo(bx - 2, cy + 6); x.lineTo(bx + 8, cy - 6); x.stroke();
+          } else {
+            x.strokeStyle = '#9FB2C1'; x.lineWidth = 3; x.stroke();
+          }
+          x.font = `500 32px ${FONT}`; x.fillStyle = done ? '#8DA0B0' : '#0F2233';
+          const label = fit(x, it.name, W - 2 * P - 200);
+          x.fillText(label, P + 92, cy + 11);
+          if (done) {
+            const w = x.measureText(label).width;
+            x.strokeStyle = '#8DA0B0'; x.lineWidth = 2;
+            x.beginPath(); x.moveTo(P + 92, cy); x.lineTo(P + 92 + w, cy); x.stroke();
+          }
+          if (it.qty > 1) {
+            x.textAlign = 'right'; x.fillStyle = '#5B6E7F'; x.font = `700 28px ${FONT}`;
+            x.fillText(`×${it.qty}`, W - P - 36, cy + 10);
+            x.textAlign = 'left';
+          }
+          iy += ROW;
+        });
+        y += h + GAP;
+      });
+
+      x.textAlign = 'center'; x.fillStyle = '#8DA0B0'; x.font = `500 26px ${FONT}`;
+      x.fillText('Pack light, travel far.', W / 2, H - 46);
+      return c;
+    }
+
+    async function saveImage() {
+      const dataUrl = listAsCanvas(lastData).toDataURL('image/png');
+      const slug = lastData.dest.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'trip';
+      const fileName = `packing-list-${slug}.png`;
+      try {
+        const P = nativePlugins();
+        if (P?.Filesystem && P?.Share) {
+          // Write to the app cache, then hand it to the system share sheet
+          // (from there: save to Files / Drive / gallery, or send to a friend).
+          const { uri } = await P.Filesystem.writeFile({ path: fileName, data: dataUrl.split(',')[1], directory: 'CACHE' });
+          await P.Share.share({ title: fileName, files: [uri], dialogTitle: 'Save or send your list' });
+          return;
+        }
+        const a = document.createElement('a');
+        a.href = dataUrl; a.download = fileName;
+        document.body.appendChild(a); a.click(); a.remove();
+        toast('Image downloaded');
+      } catch (err) {
+        if (!isCancel(err)) { console.error('save image failed', err); toast('Could not save the image'); }
+      }
+    }
+
+    // ================================================================
+    // 8. UI BINDING
+    // ================================================================
+    const adultCountRow = document.getElementById('adultCountRow');
+    const adultAgeRow   = document.getElementById('adultAgeRow');
+    const genderRow     = document.getElementById('genderRow');
+    const childCountRow = document.getElementById('childCountRow');
+    const childAgeRow   = document.getElementById('childAgeRow');
+    const childAgeField = document.getElementById('childAgeField');
+    const tripTypeRow   = document.getElementById('tripTypeRow');
+    const daysInfo      = document.getElementById('daysInfo');
+
+    function bindSingleChips(container, onSelect) {
+      container.addEventListener('click', e => {
+        const chip = e.target.closest('.chip'); if (!chip) return;
+        Array.from(container.children).forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        onSelect(chip);
+        updateDaysInfo();
+        regenerate();
+      });
+    }
+
+    bindSingleChips(adultCountRow, chip => { state.adultCount = Number(chip.dataset.value); });
+    bindSingleChips(adultAgeRow,  chip => { state.adultAge = Number(chip.dataset.value); });
+    bindSingleChips(genderRow,    chip => { state.gender = chip.dataset.value; });
+    bindSingleChips(childCountRow, chip => {
+      state.childCount = Number(chip.dataset.value);
+      childAgeField.style.display = state.childCount > 0 ? 'block' : 'none';
+    });
+    bindSingleChips(childAgeRow,  chip => { state.childAge = Number(chip.dataset.value); });
+
+    // Restore chip selections from a saved trip
+    function syncStep1UI() {
+      const mark = (row, val) => row.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.value === String(val)));
+      mark(adultCountRow, state.adultCount);
+      mark(adultAgeRow, state.adultAge);
+      mark(genderRow, state.gender);
+      mark(childCountRow, state.childCount);
+      mark(childAgeRow, state.childAge);
+      childAgeField.style.display = state.childCount > 0 ? 'block' : 'none';
+    }
+
+    // Trip type: multi-select
+    function renderTripTypes() {
+      tripTypeRow.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', state.tripTypes.has(c.dataset.value)));
+    }
+    tripTypeRow.addEventListener('click', e => {
+      const chip = e.target.closest('.chip'); if (!chip) return;
+      const v = chip.dataset.value;
+      state.tripTypes.has(v) ? state.tripTypes.delete(v) : state.tripTypes.add(v);
+      renderTripTypes();
+      renderPicked();
+      regenerate();
+    });
+
+    // --- Destination: search any city + popular quick picks ---
+    const destSearch    = document.getElementById('destSearch');
+    const searchResults = document.getElementById('searchResults');
+    const destPickedEl  = document.getElementById('destPicked');
+    const quickRow      = document.getElementById('quickRow');
+    let searchTimer, searchReq = 0, lastResults = [];
+
+    function renderPicked() {
+      const d = state.dest;
+      destPickedEl.hidden = !d;
+      updateGenBtn();
+      if (!d) { destPickedEl.innerHTML = ''; return; }
+      const where = [d.region, d.country].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ');
+      const altitude = destTags().has('plateau') ? `<div class="dp-badges"><span class="weather-tag">⛰️ High altitude</span></div>` : '';
+      destPickedEl.innerHTML = `
+        <div class="dp-main">${d.emoji || '📍'} <b>${escapeHtml(d.name)}</b><span>${escapeHtml(where)}</span></div>
+        ${altitude}
+      `;
+    }
+
+    function renderQuick() {
+      quickRow.innerHTML = DESTINATIONS.map(d =>
+        `<button class="qchip ${state.dest?.id === d.id ? 'active' : ''}" data-id="${d.id}">${d.emoji} ${escapeHtml(d.name)}</button>`
+      ).join('');
+    }
+
+    function selectDest(dest, types) {
+      state.dest = dest;
+      state.tripTypes = new Set(types);
+      destSearch.value = '';
+      searchResults.hidden = true;
+      renderPicked(); renderQuick(); renderTripTypes();
+      clearWeather();
+      regenerate();
+      fetchWeather();
+    }
+
+    quickRow.addEventListener('click', e => {
+      const b = e.target.closest('.qchip'); if (!b) return;
+      const d = DESTINATIONS.find(x => x.id === b.dataset.id);
+      if (d) selectDest({ ...d }, d.types);
+    });
+
+    async function searchPlaces(q) {
+      const id = ++searchReq;
+      searchResults.hidden = false;
+      searchResults.innerHTML = `<div class="sr-msg">Searching…</div>`;
+      const lang = /[぀-ヿ㐀-鿿가-힯]/.test(q) ? 'zh' : 'en';
+      try {
+        const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=${lang}&format=json`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (id !== searchReq) return;
+        lastResults = data.results || [];
+        searchResults.innerHTML = lastResults.length
+          ? lastResults.map((r, i) => `
+              <button class="sr-item" data-i="${i}">
+                <span class="sr-name">${escapeHtml(r.name)}</span>
+                <span class="sr-sub">${escapeHtml([r.admin1, r.country].filter(Boolean).join(', '))}</span>
+              </button>`).join('')
+          : `<div class="sr-msg">No places found — try another spelling.</div>`;
+      } catch (err) {
+        if (id !== searchReq) return;
+        searchResults.innerHTML = `<div class="sr-msg">Search needs an internet connection.</div>`;
+      }
+    }
+
+    destSearch.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      const q = destSearch.value.trim();
+      if (q.length < 2) { searchReq++; searchResults.hidden = true; return; }
+      searchTimer = setTimeout(() => searchPlaces(q), 300);
+    });
+
+    searchResults.addEventListener('click', e => {
+      const b = e.target.closest('.sr-item'); if (!b) return;
+      const r = lastResults[Number(b.dataset.i)]; if (!r) return;
+      destSearch.blur();
+      // Searched places start with no trip type; keep "City" as a gentle default.
+      selectDest({
+        id: 'geo_' + r.id, emoji: '📍', name: r.name, region: r.admin1, country: r.country,
+        cc: r.country_code, lat: r.latitude, lon: r.longitude, elevation: r.elevation, tags: [], types: []
+      }, ['city']);
+    });
+
+    // --- Dates: one button → one calendar. Tap departure, tap return, done. ---
+    const dateBtnMain = document.getElementById('dateBtnMain');
+    const calSheet    = document.getElementById('calSheet');
+    const calScroll   = document.getElementById('calScroll');
+    const calHint     = document.getElementById('calHint');
+    const FIRST_DAY = (() => {   // 0 = Sunday, 1 = Monday — follows the phone's region
+      try {
+        const loc = new Intl.Locale(navigator.language || 'en');
+        const info = loc.getWeekInfo ? loc.getWeekInfo() : loc.weekInfo;
+        return info ? info.firstDay % 7 : 1;
+      } catch (e) { return 1; }
+    })();
+    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    let calPick = null;   // departure day chosen, waiting for the return day
+
+    function updateDaysInfo() {
+      const days = calcDays();
+      const s = new Date(state.startDate + 'T00:00:00');
+      const e = new Date(state.endDate + 'T00:00:00');
+      if (isNaN(s) || isNaN(e)) { dateBtnMain.textContent = 'Pick your dates'; daysInfo.textContent = ''; return; }
+      const f = d => `${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+      dateBtnMain.textContent = state.startDate === state.endDate ? f(s) : `${f(s)} → ${f(e)}`;
+      daysInfo.textContent = `${days} day${days > 1 ? 's' : ''}`;
+    }
+
+    function renderCalendar() {
+      const wd = [...Array(7)].map((_, i) => WEEKDAYS[(i + FIRST_DAY) % 7].slice(0, 2));
+      document.getElementById('calWeekdays').innerHTML = wd.map(w => `<span>${w}</span>`).join('');
+      const s = calPick || state.startDate, e = calPick ? null : state.endDate;
+      const todayStr = toDateStr(today);
+      let html = '';
+      for (let m = 0; m < 13; m++) {
+        const first = new Date(today.getFullYear(), today.getMonth() + m, 1);
+        const daysIn = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+        const blanks = (first.getDay() - FIRST_DAY + 7) % 7;
+        html += `<div class="cal-month" data-month="${first.getFullYear()}-${first.getMonth()}">
+          <div class="cal-mtitle">${MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}</div><div class="cal-grid">`;
+        html += '<span></span>'.repeat(blanks);
+        for (let d = 1; d <= daysIn; d++) {
+          const ds = toDateStr(new Date(first.getFullYear(), first.getMonth(), d));
+          const cls = [];
+          if (ds === todayStr) cls.push('today');
+          if (calPick && ds === calPick) cls.push('pick');
+          if (!calPick && ds === s) cls.push('start');
+          if (!calPick && ds === e) cls.push('end');
+          if (!calPick && ds > s && ds < e) cls.push('in-range');
+          html += `<button class="cal-day ${cls.join(' ')}" data-date="${ds}" ${ds < todayStr ? 'disabled' : ''}><span>${d}</span></button>`;
+        }
+        html += `</div></div>`;
+      }
+      calScroll.innerHTML = html;
+    }
+
+    function openCalendar() {
+      calPick = null;
+      calHint.textContent = 'When do you leave?';
+      renderCalendar();
+      calSheet.hidden = false;
+      const start = new Date(state.startDate + 'T00:00:00');
+      const month = calScroll.querySelector(`[data-month="${start.getFullYear()}-${start.getMonth()}"]`);
+      calScroll.scrollTop = month ? month.offsetTop - calScroll.offsetTop : 0;
+    }
+    const closeCalendar = () => { calSheet.hidden = true; calPick = null; };
+
+    function setDates(start, end) {
+      state.startDate = start;
+      state.endDate = end;
+      updateDaysInfo();
+      regenerate();
+      fetchWeather();
+    }
+
+    document.getElementById('dateBtn').addEventListener('click', openCalendar);
+    document.getElementById('calClose').addEventListener('click', closeCalendar);
+    calSheet.addEventListener('click', e => { if (e.target === calSheet) closeCalendar(); });
+    calScroll.addEventListener('click', e => {
+      const b = e.target.closest('.cal-day'); if (!b || b.disabled) return;
+      const d = b.dataset.date;
+      if (!calPick || d < calPick) {
+        calPick = d;
+        const st = calScroll.scrollTop;
+        renderCalendar();
+        calScroll.scrollTop = st;
+        calHint.textContent = 'When do you come back?';
+        return;
+      }
+      const start = calPick;
+      calPick = null;
+      setDates(start, d);
+      renderCalendar();
+      setTimeout(closeCalendar, 250);
+    });
+
+    updateDaysInfo();
+
+    // --- Reminders: any of 1 week / 3 days / 1 day before, at a time you choose ---
+    const remindRow = document.getElementById('remindRow');
+    const remindTimeInput = document.getElementById('remindTime');
+    function renderReminders() {
+      remindRow.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', state.remindDays.includes(Number(c.dataset.value))));
+      const on = state.remindDays.length > 0;
+      document.getElementById('remindTimeRow').hidden = !on;
+      remindTimeInput.value = state.remindTime;
+    }
+    remindRow.addEventListener('click', e => {
+      const chip = e.target.closest('.chip'); if (!chip) return;
+      const v = Number(chip.dataset.value);
+      state.remindDays = state.remindDays.includes(v) ? state.remindDays.filter(x => x !== v) : [...state.remindDays, v].sort((a, b) => b - a);
+      renderReminders();
+    });
+    remindTimeInput.addEventListener('change', () => { if (remindTimeInput.value) state.remindTime = remindTimeInput.value; });
+
+
+    // ================================================================
+    // 9. REMINDERS (local notifications: 1 week / 3 days / 1 day before, at the chosen time)
+    // ================================================================
+    const REMIND_OPTIONS = [7, 3, 1];
+    let remindTimer;
+
+    function hashId(str) {
+      let h = 0;
+      for (const c of str) h = (h * 31 + c.charCodeAt(0)) | 0;
+      return (Math.abs(h) % 2000000000) || 1;
+    }
+    const reminderId = (tripId, days) => hashId(`${tripId}_${days}`);
+
+    async function cancelReminder(t) {
+      const LN = nativePlugins()?.LocalNotifications;
+      if (!LN) return;
+      // also clears the single reminder older versions scheduled under the bare trip id
+      const ids = [...REMIND_OPTIONS.map(d => reminderId(t.id, d)), hashId(String(t.id))];
+      try { await LN.cancel({ notifications: ids.map(id => ({ id })) }); } catch (e) {}
+    }
+
+    function reminderText(t, days, left) {
+      const name = t.dest.name;
+      const title = days === 1 ? `Tomorrow: ${name} ✈️` : days === 3 ? `3 days to ${name} ✈️` : `One week to ${name} ✈️`;
+      let body;
+      if (days === 1) {
+        body = left == null ? 'Have one last look at your list before bed.'
+             : left > 0     ? `Still ${left} thing${left > 1 ? 's' : ''} to pack. Worth a look before bed?`
+             :                'You’re all packed. Have a great trip!';
+      } else {
+        body = left == null ? 'A good time to start thinking about packing.'
+             : left > 0     ? `${left} thing${left > 1 ? 's' : ''} left to pack. A good time to make a start.`
+             :                'You’re already all packed. Nice!';
+      }
+      return { title, body };
+    }
+
+    // `left` = items still to pack (null if unknown); `ask` = allowed to show the permission prompt
+    async function scheduleReminder(t, left, ask) {
+      const LN = nativePlugins()?.LocalNotifications;
+      if (!LN) return;
+      try {
+        await cancelReminder(t);
+        const [hh, mm] = (t.remindTime || '20:00').split(':').map(Number);
+        const now = new Date();
+        const list = reminderDaysOf(t).map(days => {
+          const at = new Date(t.startDate + 'T00:00:00');
+          at.setDate(at.getDate() - days);
+          at.setHours(hh, mm, 0, 0);
+          return { days, at };
+        }).filter(r => r.at > now);
+        if (!list.length) return;
+        let perm = await LN.checkPermissions();
+        if (perm.display !== 'granted' && ask) perm = await LN.requestPermissions();
+        if (perm.display !== 'granted') return;
+        await LN.schedule({ notifications: list.map(({ days, at }) => ({
+          id: reminderId(t.id, days),
+          ...reminderText(t, days, left),
+          schedule: { at, allowWhileIdle: true },
+          extra: { tripId: t.id }
+        })) });
+      } catch (e) { console.error('reminder failed', e); }
+    }
+
+    // ================================================================
+    // 10. SCREENS: Home (My Trips) → Edit trip → Packing list
+    //     Hash-based so the Android back button works.
+    // ================================================================
+    const homeEl  = document.getElementById('home');
+    const step1El = document.getElementById('step1');
+    const step2El = document.getElementById('step2');
+    const tripListEl = document.getElementById('tripList');
+    const SCREENS = { home: homeEl, edit: step1El, list: step2El };
+    let route = 'home';
+    let editReturnsToList = false;   // was the edit screen opened from a list (vs. "Plan a new trip")?
+
+    const routeFromHash = () => location.hash === '#list' ? 'list' : location.hash === '#edit' ? 'edit' : 'home';
+
+    function show(r) {
+      route = r;
+      Object.entries(SCREENS).forEach(([k, el]) => { el.hidden = k !== r; });
+      if (r === 'home') renderHome();
+      if (r === 'list') {
+        view = 'focus'; focusCat = undefined; addingCat = null; editingQty = null;
+        saveTrip();
+        regenerate();
+        if (!storage.getItem('swipe_tip')) {
+          storage.setItem('swipe_tip', '1');
+          // never cover an Undo message
+          setTimeout(() => { if (!toastUndo) toast('Swipe ← to delete, → for often forgotten', null, 5000); }, 600);
+        }
+      }
+      window.scrollTo(0, 0);
+    }
+    window.addEventListener('hashchange', () => show(routeFromHash()));
+
+    function refreshStep1() {
+      syncStep1UI();
+      updateDaysInfo();
+      renderPicked(); renderQuick(); renderTripTypes(); renderReminders();
+      destSearch.value = '';
+      searchResults.hidden = true;
+      const editing = !!findTrip(state.tripId);
+      document.getElementById('editTitle').textContent = editing ? 'Edit trip' : 'Plan a trip';
+      document.querySelector('#genBtn .btn-text').textContent = editing ? 'Update Packing List' : 'Generate Packing List';
+      document.getElementById('editBackBtn').textContent = editReturnsToList ? '‹ Back to list' : '‹ My Trips';
+    }
+
+    function openTrip(id) {
+      const t = findTrip(id);
+      if (!t) return;
+      applyTrip(t);
+      refreshStep1();
+      weatherDaysEl.innerHTML = '';
+      renderWeatherTags(state.autoWeatherTags);
+      fetchWeather();
+      if (route === 'list') show('list'); else location.hash = 'list';
+    }
+
+    function startNewTrip() {
+      // The trip you worked on most recently is the template for the next one
+      const last = [...trips].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+      state.tripId = null;
+      // Same travellers, reminder habits and your own items; destination and dates start fresh
+      if (last) ['adultCount','adultAge','childCount','childAge','gender'].forEach(k => { if (last[k] != null) state[k] = last[k]; });
+      state.customItems = (last && Array.isArray(last.customItems) ? last.customItems : []).map(c => ({ ...c }));
+      state.remindDays = last ? [...reminderDaysOf(last)] : [1];
+      state.remindTime = (last && last.remindTime) || '20:00';
+      state.dest = null;
+      state.tripTypes = new Set();
+      state.startDate = toDateStr(today);
+      state.endDate = toDateStr(inTwoDays);
+      editReturnsToList = false;
+      clearWeather();
+      refreshStep1();
+      fetchWeather();
+      location.hash = 'edit';
+    }
+
+    // Packed/total for any saved trip (temporarily loads it into state)
+    function tripStats(t) {
+      const prev = tripFromState();
+      applyTrip(t);
+      let out = { total: 0, packed: 0, days: calcDays() };
+      try {
+        const d = generate();
+        out.total = d.total;
+        out.packed = d.groups.reduce((n, g) => n + g.items.filter(it => isPacked(it.id)).length, 0);
+      } catch (e) {}
+      applyTrip(prev);
+      return out;
+    }
+
+    function tripBadge(t) {
+      const s = new Date(t.startDate + 'T00:00:00');
+      const diff = Math.round((s - today) / 86400000);
+      if (tripEnded(t)) return 'Done';
+      if (diff > 1)     return `In ${diff} days`;
+      if (diff === 1)   return 'Tomorrow';
+      if (diff === 0)   return 'Today';
+      return 'On the trip';
+    }
+
+    function tripCard(t) {
+      const s = tripStats(t);
+      const pct = s.total ? Math.round(s.packed / s.total * 100) : 0;
+      return `
+        <div class="trip-card glass ${tripEnded(t) ? 'past' : ''}" data-trip="${t.id}" role="button" tabindex="0">
+          <div class="trip-emoji">${t.dest.emoji || '📍'}</div>
+          <div class="trip-info">
+            <div class="trip-top"><span class="trip-name">${escapeHtml(t.dest.name)}</span><span class="trip-badge">${tripBadge(t)}</span></div>
+            <div class="trip-dates">${dateRangeText(t.startDate, t.endDate)} · ${s.days} day${s.days > 1 ? 's' : ''}</div>
+            <div class="trip-bar"><div style="width:${pct}%"></div></div>
+            <div class="trip-meta"><span>${s.packed}/${s.total} packed</span><button class="f-del" data-deltrip="${t.id}" aria-label="Delete trip">×</button></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHome() {
+      if (!trips.length) {
+        tripListEl.innerHTML = `
+          <div class="home-empty">
+            <div class="big">🧳</div>
+            <b>No trips yet</b>
+            Going somewhere soon?<br>Add your trip and start packing.
+          </div>`;
+        return;
+      }
+      const upcoming = trips.filter(t => !tripEnded(t)).sort((a, b) => a.startDate.localeCompare(b.startDate));
+      const past     = trips.filter(tripEnded).sort((a, b) => b.startDate.localeCompare(a.startDate));
+      tripListEl.innerHTML = upcoming.map(tripCard).join('')
+        + (past.length ? `<div class="sub-label">Past trips</div>${past.map(tripCard).join('')}` : '');
+    }
+
+    tripListEl.addEventListener('click', e => {
+      const del = e.target.closest('[data-deltrip]');
+      if (del) {
+        const i = trips.findIndex(t => t.id === del.dataset.deltrip);
+        if (i < 0) return;
+        const [t] = trips.splice(i, 1);
+        saveTrips(); cancelReminder(t); renderHome();
+        toast(`Deleted ${t.dest.name} trip`, () => { trips.splice(i, 0, t); saveTrips(); scheduleReminder(t, null, false); renderHome(); });
+        return;
+      }
+      const card = e.target.closest('[data-trip]');
+      if (card) openTrip(card.dataset.trip);
+    });
+    tripListEl.addEventListener('keydown', e => {
+      const card = e.target.closest('[data-trip]');
+      if (card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openTrip(card.dataset.trip); }
+    });
+
+    document.getElementById('newTripBtn').addEventListener('click', startNewTrip);
+    document.getElementById('editBackBtn').addEventListener('click', () => history.back());
+    function updateGenBtn() {
+      document.getElementById('genBtn').classList.toggle('is-disabled', !state.dest);
+    }
+
+    document.getElementById('genBtn').addEventListener('click', () => {
+      if (!state.dest) {
+        toast('Pick a destination first');
+        destSearch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        destSearch.focus();
+        return;
+      }
+      // Back to the list we came from, or swap "edit" for "list" so Back from the list lands on My Trips
+      if (editReturnsToList) history.back();
+      else location.replace('#list');
+    });
+
+    // Tapping the reminder opens that trip's list
+    nativePlugins()?.LocalNotifications?.addListener('localNotificationActionPerformed', e => {
+      const id = e?.notification?.extra?.tripId;
+      if (id && findTrip(id)) openTrip(id);
+    });
+
+    // ================================================================
+    // 11. INIT — open the trip you were packing, otherwise My Trips
+    // ================================================================
+    window.addEventListener('load', () => {
+      if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+      show('home');
+      const last = findTrip(storage.getItem('last_trip'));
+      // 上次的行程还没结束 → 直接回到清单. Deferred until after the load event:
+      // a hash change during "load" replaces the history entry, so Back would have no My Trips to return to.
+      if (last && !tripEnded(last)) setTimeout(() => openTrip(last.id), 0);
+    });
+  </script>
+</body>
+</html>

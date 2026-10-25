@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PackGo</string>
+    <string name="title_activity_main">PackGo</string>
+    <string name="package_name">com.songxinrong.packgo</string>
+    <string name="custom_url_scheme">com.songxinrong.packgo</string>
+</resources>

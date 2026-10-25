@@ -1,0 +1,18 @@
+# dependencies & build output
+node_modules/
+android/app/build/
+android/build/
+android/.gradle/
+android/.idea/
+*.apk
+*.aab
+
+# release signing — NEVER commit these
+release-key/
+*.jks
+*.keystore
+android/keystore.properties
+
+# local / OS
+android/local.properties
+.DS_Store
